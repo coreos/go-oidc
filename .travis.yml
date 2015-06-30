@@ -1,12 +1,7 @@
 language: go
-matrix:
-  include:
-    - go: 1.4
-      env: TOOLS_CMD=golang.org/x/tools/cmd
 
-install:
- - go get ${TOOLS_CMD}/cover
- - go get ${TOOLS_CMD}/vet
+go:
+  - 1.4
 
 script:
  - ./test
