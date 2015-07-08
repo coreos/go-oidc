@@ -9,7 +9,6 @@ import (
 
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/key"
-	pnet "github.com/coreos/go-oidc/pkg/net"
 )
 
 func VerifySignature(jwt jose.JWT, keys []key.PublicKey) (bool, error) {
@@ -48,7 +47,7 @@ func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
 	// iss REQUIRED. Issuer Identifier for the Issuer of the response.
 	// The iss value is a case sensitive URL using the https scheme that contains scheme, host, and optionally, port number and path components and no query or fragment components.
 	if iss, exists := claims["iss"].(string); exists {
-		if !pnet.URLEqual(iss, issuer) {
+		if !urlEqual(iss, issuer) {
 			return fmt.Errorf("invalid claim value: 'iss'. expected=%s, found=%s.", issuer, iss)
 		}
 	} else {
@@ -87,7 +86,7 @@ func VerifyClientClaims(jwt jose.JWT, issuer string) (string, error) {
 		return "", fmt.Errorf("failed to parse 'iss' claim: %v", err)
 	} else if !ok {
 		return "", errors.New("missing required 'iss' claim")
-	} else if !pnet.URLEqual(iss, issuer) {
+	} else if !urlEqual(iss, issuer) {
 		return "", fmt.Errorf("'iss' claim does not match expected issuer, iss=%s", iss)
 	}
 
