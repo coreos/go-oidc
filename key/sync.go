@@ -6,7 +6,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
-	ptime "github.com/coreos/go-oidc/pkg/time"
+	"github.com/coreos/pkg/timeutil"
 )
 
 func NewKeySetSyncer(r ReadableKeySetRepo, w WritableKeySetRepo) *KeySetSyncer {
@@ -35,7 +35,7 @@ func (s *KeySetSyncer) Run() chan struct{} {
 					failing = true
 					next = time.Second
 				} else {
-					next = ptime.ExpBackoff(next, time.Minute)
+					next = timeutil.ExpBackoff(next, time.Minute)
 				}
 				if exp == 0 {
 					log.Errorf("Synced to already expired key set, retrying in %v: %v", next, err)

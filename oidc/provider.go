@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/coreos/pkg/capnslog"
+	"github.com/coreos/pkg/timeutil"
 	"github.com/jonboulle/clockwork"
 
 	phttp "github.com/coreos/go-oidc/http"
 	"github.com/coreos/go-oidc/oauth2"
-	pnet "github.com/coreos/go-oidc/pkg/net"
-	ptime "github.com/coreos/go-oidc/pkg/time"
 )
 
 var (
@@ -159,7 +158,7 @@ func (r *pcsStepRetry) step(fn pcsStepFunc) (next pcsStepper) {
 		next = &pcsStepNext{aft: ttl}
 		log.Infof("Provider config sync no longer failing")
 	} else {
-		next = &pcsStepRetry{aft: ptime.ExpBackoff(r.aft, time.Minute)}
+		next = &pcsStepRetry{aft: timeutil.ExpBackoff(r.aft, time.Minute)}
 		log.Errorf("Provider config sync still failing, retrying in %v: %v", next.after(), err)
 	}
 	return
@@ -221,7 +220,7 @@ func (r *httpProviderConfigGetter) Get() (cfg ProviderConfig, err error) {
 
 	// The issuer value returned MUST be identical to the Issuer URL that was directly used to retrieve the configuration information.
 	// http://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationValidation
-	if !pnet.URLEqual(cfg.Issuer, r.issuerURL) {
+	if !urlEqual(cfg.Issuer, r.issuerURL) {
 		err = fmt.Errorf(`"issuer" in config (%v) does not match provided issuer URL (%v)`, cfg.Issuer, r.issuerURL)
 		return
 	}
@@ -251,7 +250,7 @@ func waitForProviderConfig(hc phttp.Client, issuerURL string, clock clockwork.Cl
 			break
 		}
 
-		sleep = ptime.ExpBackoff(sleep, time.Minute)
+		sleep = timeutil.ExpBackoff(sleep, time.Minute)
 		fmt.Printf("Failed fetching provider config, trying again in %v: %v\n", sleep, err)
 		time.Sleep(sleep)
 	}

@@ -1,16 +1,17 @@
 package oidc
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
-	pcrypto "github.com/coreos/go-oidc/pkg/crypto"
 )
 
 func ParseTokenFromRequest(r *http.Request) (token jose.JWT, err error) {
@@ -40,7 +41,7 @@ func NewClaims(iss, sub, aud string, iat, exp time.Time) jose.Claims {
 }
 
 func GenClientID(hostport string) (string, error) {
-	b, err := pcrypto.RandBytes(32)
+	b, err := randBytes(32)
 	if err != nil {
 		return "", err
 	}
@@ -56,4 +57,29 @@ func GenClientID(hostport string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s@%s", base64.URLEncoding.EncodeToString(b), host), nil
+}
+
+func randBytes(n int) ([]byte, error) {
+	b := make([]byte, n)
+	got, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	} else if n != got {
+		return nil, errors.New("unable to generate enough random data")
+	}
+	return b, nil
+}
+
+// urlEqual checks two urls for equality using only the host and path portions.
+func urlEqual(url1, url2 string) bool {
+	u1, err := url.Parse(url1)
+	if err != nil {
+		return false
+	}
+	u2, err := url.Parse(url2)
+	if err != nil {
+		return false
+	}
+
+	return strings.ToLower(u1.Host+u1.Path) == strings.ToLower(u2.Host+u2.Path)
 }
