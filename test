@@ -14,7 +14,7 @@ COVER=${COVER:-"-cover"}
 
 source ./build
 
-TESTABLE="http jose key oauth2 oidc pkg/net pkg/time "
+TESTABLE="http jose key oauth2 oidc pkg/net"
 FORMATTABLE="$TESTABLE"
 
 # user has not provided PKG override
