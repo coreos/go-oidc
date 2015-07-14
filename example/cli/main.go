@@ -36,7 +36,7 @@ func main() {
 		Secret: *clientSecret,
 	}
 
-	log.Printf("fetching provider config from %s...", *discovery)
+	fmt.Printf("fetching provider config from %s...", *discovery)
 
 	// NOTE: A real CLI would cache this config, or provide it via flags/config file.
 	var cfg oidc.ProviderConfig
