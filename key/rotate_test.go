@@ -170,7 +170,7 @@ func TestPrivateKeyRotatorExpiresAt(t *testing.T) {
 	}
 }
 
-func TestShouldRotate(t *testing.T) {
+func TestNextRotation(t *testing.T) {
 	fc := clockwork.NewFakeClock()
 	now := fc.Now().UTC()
 
@@ -178,41 +178,48 @@ func TestShouldRotate(t *testing.T) {
 		expiresAt time.Time
 		ttl       time.Duration
 		numKeys   int
-		expected  bool
+		expected  time.Duration
 	}{
+		{
+			// closest to prod
+			expiresAt: now.Add(time.Hour * 24),
+			ttl:       time.Hour * 24,
+			numKeys:   2,
+			expected:  time.Hour * 12,
+		},
 		{
 			expiresAt: now.Add(time.Hour * 2),
 			ttl:       time.Hour * 4,
 			numKeys:   2,
-			expected:  false,
+			expected:  0,
 		},
 		{
 			// No keys.
 			expiresAt: now.Add(time.Hour * 2),
 			ttl:       time.Hour * 4,
 			numKeys:   0,
-			expected:  true,
+			expected:  0,
 		},
 		{
 			// Nil keyset.
 			expiresAt: now.Add(time.Hour * 2),
 			ttl:       time.Hour * 4,
 			numKeys:   -1,
-			expected:  true,
+			expected:  0,
 		},
 		{
 			// KeySet expired.
 			expiresAt: now.Add(time.Hour * -2),
 			ttl:       time.Hour * 4,
 			numKeys:   2,
-			expected:  true,
+			expected:  0,
 		},
 		{
 			// Expiry past now + TTL
 			expiresAt: now.Add(time.Hour * 5),
 			ttl:       time.Hour * 4,
 			numKeys:   2,
-			expected:  true,
+			expected:  3 * time.Hour,
 		},
 	}
 
@@ -229,7 +236,7 @@ func TestShouldRotate(t *testing.T) {
 			}
 			kRepo.Set(pks)
 		}
-		actual, err := krot.shouldRotate()
+		actual, err := krot.nextRotation()
 		if err != nil {
 			t.Errorf("case %d: error calling shouldRotate(): %v", i, err)
 		}
