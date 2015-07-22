@@ -11,6 +11,8 @@ import (
 
 var (
 	log = capnslog.NewPackageLogger("github.com/coreos/go-oidc", "key")
+
+	ErrorPrivateKeysExpired = errors.New("private keys have expired")
 )
 
 func NewPrivateKeyRotator(repo PrivateKeySetRepo, ttl time.Duration) *PrivateKeyRotator {
@@ -36,19 +38,40 @@ func (r *PrivateKeyRotator) expiresAt() time.Time {
 	return r.clock.Now().UTC().Add(r.ttl)
 }
 
-func (r *PrivateKeyRotator) nextRotation() (time.Duration, error) {
+func (r *PrivateKeyRotator) Healthy() error {
+	pks, err := r.privateKeySet()
+	if err != nil {
+		return err
+	}
+
+	if r.clock.Now().After(pks.ExpiresAt()) {
+		return ErrorPrivateKeysExpired
+	}
+
+	return nil
+}
+
+func (r *PrivateKeyRotator) privateKeySet() (*PrivateKeySet, error) {
 	ks, err := r.repo.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	pks, ok := ks.(*PrivateKeySet)
+	if !ok {
+		return nil, errors.New("unable to cast to PrivateKeySet")
+	}
+	return pks, nil
+}
+
+func (r *PrivateKeyRotator) nextRotation() (time.Duration, error) {
+	pks, err := r.privateKeySet()
 	if err == ErrorNoKeys {
 		log.Infof("No keys in private key set; must rotate immediately")
 		return 0, nil
 	}
 	if err != nil {
 		return 0, err
-	}
-
-	pks, ok := ks.(*PrivateKeySet)
-	if !ok {
-		return 0, errors.New("unable to cast to PrivateKeySet")
 	}
 
 	now := r.clock.Now()
