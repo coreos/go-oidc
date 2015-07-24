@@ -224,14 +224,34 @@ func (c *Client) ClientCredsToken(scope []string) (jose.JWT, error) {
 	return jwt, c.VerifyJWT(jwt)
 }
 
-// Exchange an OAuth2 auth code for an OIDC JWT
+// ExchangeAuthCode exchanges an OAuth2 auth code for an OIDC JWT ID token.
 func (c *Client) ExchangeAuthCode(code string) (jose.JWT, error) {
 	oac, err := c.OAuthClient()
 	if err != nil {
 		return jose.JWT{}, err
 	}
 
-	t, err := oac.Exchange(code)
+	t, err := oac.RequestToken(oauth2.GrantTypeAuthCode, code)
+	if err != nil {
+		return jose.JWT{}, err
+	}
+
+	jwt, err := jose.ParseJWT(t.IDToken)
+	if err != nil {
+		return jose.JWT{}, err
+	}
+
+	return jwt, c.VerifyJWT(jwt)
+}
+
+// RefreshToken uses a refresh token to exchange for a new OIDC JWT ID Token.
+func (c *Client) RefreshToken(refreshToken string) (jose.JWT, error) {
+	oac, err := c.OAuthClient()
+	if err != nil {
+		return jose.JWT{}, err
+	}
+
+	t, err := oac.RequestToken(oauth2.GrantTypeRefreshToken, refreshToken)
 	if err != nil {
 		return jose.JWT{}, err
 	}
