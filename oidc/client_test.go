@@ -18,32 +18,32 @@ func TestNewClientScopeDefault(t *testing.T) {
 	}{
 		{
 			// No scope
-			c: ClientConfig{},
+			c: ClientConfig{RedirectURL: "http://example.com/redirect"},
 			e: DefaultScope,
 		},
 		{
 			// Nil scope
-			c: ClientConfig{Scope: nil},
+			c: ClientConfig{RedirectURL: "http://example.com/redirect", Scope: nil},
 			e: DefaultScope,
 		},
 		{
 			// Empty scope
-			c: ClientConfig{Scope: []string{}},
+			c: ClientConfig{RedirectURL: "http://example.com/redirect", Scope: []string{}},
 			e: []string{},
 		},
 		{
 			// Custom scope equal to default
-			c: ClientConfig{Scope: []string{"openid", "email", "profile"}},
+			c: ClientConfig{RedirectURL: "http://example.com/redirect", Scope: []string{"openid", "email", "profile"}},
 			e: DefaultScope,
 		},
 		{
 			// Custom scope not including defaults
-			c: ClientConfig{Scope: []string{"foo", "bar"}},
+			c: ClientConfig{RedirectURL: "http://example.com/redirect", Scope: []string{"foo", "bar"}},
 			e: []string{"foo", "bar"},
 		},
 		{
 			// Custom scopes overlapping with defaults
-			c: ClientConfig{Scope: []string{"openid", "foo"}},
+			c: ClientConfig{RedirectURL: "http://example.com/redirect", Scope: []string{"openid", "foo"}},
 			e: []string{"openid", "foo"},
 		},
 	}
