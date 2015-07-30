@@ -75,17 +75,17 @@ func NewClient(hc phttp.Client, cfg Config) (c *Client, err error) {
 		return
 	}
 
-	au, err := url.Parse(cfg.AuthURL)
+	au, err := phttp.ParseNonEmptyURL(cfg.AuthURL)
 	if err != nil {
 		return
 	}
 
-	tu, err := url.Parse(cfg.TokenURL)
+	tu, err := phttp.ParseNonEmptyURL(cfg.TokenURL)
 	if err != nil {
 		return
 	}
 
-	ru, err := url.Parse(cfg.RedirectURL)
+	ru, err := phttp.ParseNonEmptyURL(cfg.RedirectURL)
 	if err != nil {
 		return
 	}

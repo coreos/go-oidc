@@ -14,19 +14,43 @@ import (
 	"github.com/coreos/go-oidc/jose"
 )
 
-func ParseTokenFromRequest(r *http.Request) (token jose.JWT, err error) {
+// RequestTokenExtractor funcs extract a raw encoded token from a request.
+type RequestTokenExtractor func(r *http.Request) (string, error)
+
+// ExtractBearerToken is a RequestTokenExtractor which extracts a bearer token from a request's
+// Authorization header.
+func ExtractBearerToken(r *http.Request) (string, error) {
 	ah := r.Header.Get("Authorization")
 	if ah == "" {
-		err = errors.New("missing Authorization header")
-		return
+		return "", errors.New("missing Authorization header")
 	}
 
 	if len(ah) <= 6 || strings.ToUpper(ah[0:6]) != "BEARER" {
-		err = errors.New("should be a bearer token")
-		return
+		return "", errors.New("should be a bearer token")
 	}
 
-	return jose.ParseJWT(ah[7:])
+	val := ah[7:]
+	if len(val) == 0 {
+		return "", errors.New("bearer token is empty")
+	}
+
+	return val, nil
+}
+
+// CookieTokenExtractor returns a RequestTokenExtractor which extracts a token from the named cookie in a request.
+func CookieTokenExtractor(cookieName string) RequestTokenExtractor {
+	return func(r *http.Request) (string, error) {
+		ck, err := r.Cookie(cookieName)
+		if err != nil {
+			return "", fmt.Errorf("token cookie not found in request: %v", err)
+		}
+
+		if ck.Value == "" {
+			return "", errors.New("token cookie found but is empty")
+		}
+
+		return ck.Value, nil
+	}
 }
 
 func NewClaims(iss, sub, aud string, iat, exp time.Time) jose.Claims {

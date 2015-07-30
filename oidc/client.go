@@ -66,11 +66,16 @@ type ClientConfig struct {
 }
 
 func NewClient(cfg ClientConfig) (*Client, error) {
+	ru, err := phttp.ParseNonEmptyURL(cfg.RedirectURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid redirect URL: %v", err)
+	}
+
 	c := Client{
 		credentials:    cfg.Credentials,
 		httpClient:     cfg.HTTPClient,
 		scope:          cfg.Scope,
-		redirectURL:    cfg.RedirectURL,
+		redirectURL:    ru.String(),
 		providerConfig: cfg.ProviderConfig,
 		keySet:         cfg.KeySet,
 	}

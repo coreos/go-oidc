@@ -136,6 +136,8 @@ func TestClientCredsToken(t *testing.T) {
 		Scope:       []string{"foo-scope", "bar-scope"},
 		TokenURL:    "http://example.com/token",
 		AuthMethod:  AuthMethodClientSecretBasic,
+		RedirectURL: "http://example.com/redirect",
+		AuthURL:     "http://example.com/auth",
 	}
 
 	c, err := NewClient(hc, cfg)
@@ -212,6 +214,8 @@ func TestNewAuthenticatedRequest(t *testing.T) {
 			Credentials: ClientCredentials{ID: "cid", Secret: "csecret"},
 			Scope:       []string{"foo-scope", "bar-scope"},
 			TokenURL:    "http://example.com/token",
+			AuthURL:     "http://example.com/auth",
+			RedirectURL: "http://example.com/redirect",
 			AuthMethod:  tt.authMethod,
 		}
 		c, err := NewClient(hc, cfg)
