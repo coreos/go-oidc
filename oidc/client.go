@@ -66,7 +66,9 @@ type ClientConfig struct {
 }
 
 func NewClient(cfg ClientConfig) (*Client, error) {
-	ru, err := phttp.ParseNonEmptyURL(cfg.RedirectURL)
+	// Allow empty redirect URL in the case where the client
+	// only needs to verify a given token.
+	ru, err := url.Parse(cfg.RedirectURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid redirect URL: %v", err)
 	}
