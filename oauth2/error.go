@@ -11,6 +11,7 @@ const (
 	ErrorInvalidGrant            = "invalid_grant"
 	ErrorInvalidRequest          = "invalid_request"
 	ErrorServerError             = "server_error"
+	ErrorUnauthorizedClient      = "unauthorized_client"
 	ErrorUnsupportedGrantType    = "unsupported_grant_type"
 	ErrorUnsupportedResponseType = "unsupported_response_type"
 )
