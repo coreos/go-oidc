@@ -1,8 +1,6 @@
 package jose
 
-import (
-	"strings"
-)
+import "strings"
 
 type JWT JWS
 
