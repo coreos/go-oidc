@@ -250,9 +250,11 @@ func parseTokenResponse(resp *http.Response) (result TokenResponse, err error) {
 		if e == "" {
 			e = vals.Get("expires")
 		}
-		result.Expires, err = strconv.Atoi(e)
-		if err != nil {
-			return
+		if e != "" {
+			result.Expires, err = strconv.Atoi(e)
+			if err != nil {
+				return
+			}
 		}
 	} else {
 		b := make(map[string]interface{})
