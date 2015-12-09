@@ -12,6 +12,8 @@
 # Invoke ./cover for HTML output
 COVER=${COVER:-"-cover"}
 
+RACE=${RACE:-"-race"}
+
 source ./build
 
 TESTABLE="http jose key oauth2 oidc"
@@ -37,7 +39,7 @@ split=(${TEST// / })
 TEST=${split[@]/#/github.com/coreos/go-oidc/}
 
 echo "Running tests..."
-go test ${COVER} $@ ${TEST}
+go test $RACE ${COVER} $@ ${TEST}
 
 echo "Checking gofmt..."
 fmtRes=$(gofmt -l $FMT)
