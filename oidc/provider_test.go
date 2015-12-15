@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -46,6 +47,47 @@ func (s *fakeProviderConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
+}
+
+func TestProviderConfigRequiredFields(t *testing.T) {
+	// Ensure provider metadata responses have all the required fields.
+	// taken from https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+	requiredFields := []string{
+		"issuer",
+		"authorization_endpoint",
+		"token_endpoint", // "This is REQUIRED unless only the Implicit Flow is used."
+		"jwks_uri",
+		"response_types_supported",
+		"subject_types_supported",
+		"id_token_signing_alg_values_supported",
+	}
+
+	svr := &fakeProviderConfigHandler{
+		cfg: ProviderConfig{
+			Issuer:    "https://example.com",
+			ExpiresAt: time.Now().Add(time.Minute),
+		},
+		maxAge: time.Minute,
+	}
+	s := httptest.NewServer(svr)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/")
+	if err != nil {
+		t.Errorf("get: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	var data map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Errorf("decode: %v", err)
+		return
+	}
+	for _, field := range requiredFields {
+		if _, ok := data[field]; !ok {
+			t.Errorf("provider metadata does not have required field '%s'", field)
+		}
+	}
 }
 
 func TestHTTPProviderConfigGetter(t *testing.T) {
