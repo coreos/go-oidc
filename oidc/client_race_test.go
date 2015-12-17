@@ -22,7 +22,8 @@ func (p *testProvider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := ProviderConfig{
-		Issuer: p.baseURL,
+		Issuer:    p.baseURL,
+		ExpiresAt: time.Now().Add(time.Second),
 	}
 	json.NewEncoder(w).Encode(&cfg)
 }
@@ -44,10 +45,6 @@ func TestProviderSyncRace(t *testing.T) {
 
 	cliCfg := ClientConfig{
 		HTTPClient: http.DefaultClient,
-		ProviderConfig: ProviderConfig{
-			Issuer:    s.URL,
-			ExpiresAt: time.Now().Add(time.Minute), // Must expire to trigger frequent syncs.
-		},
 	}
 	cli, err := NewClient(cliCfg)
 	if err != nil {
@@ -55,8 +52,16 @@ func TestProviderSyncRace(t *testing.T) {
 		return
 	}
 
+	if !cli.providerConfig.Get().Empty() {
+		t.Errorf("want c.ProviderConfig == nil, got c.ProviderConfig=%#v")
+	}
+
 	// SyncProviderConfig beings a goroutine which writes to the client's provider config.
 	c := cli.SyncProviderConfig(s.URL)
+	if cli.providerConfig.Get().Empty() {
+		t.Errorf("want c.ProviderConfig != nil")
+	}
+
 	defer func() {
 		// stop the background process
 		c <- struct{}{}
