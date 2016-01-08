@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 )
 
 type testProvider struct {
-	baseURL string
+	baseURL *url.URL
 }
 
 func (p *testProvider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +26,7 @@ func (p *testProvider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Issuer:    p.baseURL,
 		ExpiresAt: time.Now().Add(time.Second),
 	}
+	cfg = fillRequiredProviderFields(cfg)
 	json.NewEncoder(w).Encode(&cfg)
 }
 
@@ -35,7 +37,11 @@ func TestProviderSyncRace(t *testing.T) {
 
 	s := httptest.NewServer(prov)
 	defer s.Close()
-	prov.baseURL = s.URL
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prov.baseURL = u
 
 	prevValue := minimumProviderConfigSyncInterval
 	defer func() { minimumProviderConfigSyncInterval = prevValue }()

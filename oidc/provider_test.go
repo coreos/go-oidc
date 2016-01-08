@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -15,8 +16,332 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	phttp "github.com/coreos/go-oidc/http"
+	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/oauth2"
 )
+
+func TestProviderConfigDefaults(t *testing.T) {
+	var cfg ProviderConfig
+	cfg = cfg.Defaults()
+	tests := []struct {
+		got, want []string
+		name      string
+	}{
+		{cfg.GrantTypesSupported, DefaultGrantTypesSupported, "grant types"},
+		{cfg.ResponseModesSupported, DefaultResponseModesSupported, "response modes"},
+		{cfg.ClaimTypesSupported, DefaultClaimTypesSupported, "claim types"},
+		{
+			cfg.TokenEndpointAuthMethodsSupported,
+			DefaultTokenEndpointAuthMethodsSupported,
+			"token endpoint auth methods",
+		},
+	}
+
+	for _, tt := range tests {
+		if !reflect.DeepEqual(tt.want, tt.got) {
+			t.Errorf("%s: want=%s, got=%s", tt.name, tt.want, tt.got)
+		}
+	}
+}
+
+func TestProviderConfigUnmarshal(t *testing.T) {
+
+	// helper for quickly creating uris
+	uri := func(path string) *url.URL {
+		return &url.URL{
+			Scheme: "https",
+			Host:   "server.example.com",
+			Path:   path,
+		}
+	}
+
+	tests := []struct {
+		data    string
+		want    ProviderConfig
+		wantErr bool
+	}{
+		{
+			data: `{
+				"issuer": "https://server.example.com",
+				"authorization_endpoint": "https://server.example.com/connect/authorize",
+				"token_endpoint": "https://server.example.com/connect/token",
+				"token_endpoint_auth_methods_supported": ["client_secret_basic", "private_key_jwt"],
+				"token_endpoint_auth_signing_alg_values_supported": ["RS256", "ES256"],
+				"userinfo_endpoint": "https://server.example.com/connect/userinfo",
+				"jwks_uri": "https://server.example.com/jwks.json",
+				"registration_endpoint": "https://server.example.com/connect/register",
+				"scopes_supported": [
+					"openid", "profile", "email", "address", "phone", "offline_access"
+				],
+				"response_types_supported": [
+					"code", "code id_token", "id_token", "id_token token"
+				],
+				"acr_values_supported": [
+					"urn:mace:incommon:iap:silver", "urn:mace:incommon:iap:bronze"
+				],
+				"subject_types_supported": ["public", "pairwise"],
+				"userinfo_signing_alg_values_supported": ["RS256", "ES256", "HS256"],
+				"userinfo_encryption_alg_values_supported": ["RSA1_5", "A128KW"],
+				"userinfo_encryption_enc_values_supported": ["A128CBC-HS256", "A128GCM"],
+				"id_token_signing_alg_values_supported": ["RS256", "ES256", "HS256"],
+				"id_token_encryption_alg_values_supported": ["RSA1_5", "A128KW"],
+				"id_token_encryption_enc_values_supported": ["A128CBC-HS256", "A128GCM"],
+				"request_object_signing_alg_values_supported": ["none", "RS256", "ES256"],
+				"display_values_supported": ["page", "popup"],
+				"claim_types_supported": ["normal", "distributed"],
+				"claims_supported": [
+					"sub", "iss", "auth_time", "acr", "name", "given_name",
+					"family_name", "nickname", "profile", "picture", "website",
+					"email", "email_verified", "locale", "zoneinfo",
+					"http://example.info/claims/groups"
+				],
+				"claims_parameter_supported": true,
+				"service_documentation": "https://server.example.com/connect/service_documentation.html",
+				"ui_locales_supported": ["en-US", "en-GB", "en-CA", "fr-FR", "fr-CA"]
+			}
+			`,
+			want: ProviderConfig{
+				Issuer:        &url.URL{Scheme: "https", Host: "server.example.com"},
+				AuthEndpoint:  uri("/connect/authorize"),
+				TokenEndpoint: uri("/connect/token"),
+				TokenEndpointAuthMethodsSupported: []string{
+					oauth2.AuthMethodClientSecretBasic, oauth2.AuthMethodPrivateKeyJWT,
+				},
+				TokenEndpointAuthSigningAlgValuesSupported: []string{
+					jose.AlgRS256, jose.AlgES256,
+				},
+				UserInfoEndpoint:     uri("/connect/userinfo"),
+				KeysEndpoint:         uri("/jwks.json"),
+				RegistrationEndpoint: uri("/connect/register"),
+				ScopesSupported: []string{
+					"openid", "profile", "email", "address", "phone", "offline_access",
+				},
+				ResponseTypesSupported: []string{
+					oauth2.ResponseTypeCode, oauth2.ResponseTypeCodeIDToken,
+					oauth2.ResponseTypeIDToken, oauth2.ResponseTypeIDTokenToken,
+				},
+				ACRValuesSupported: []string{
+					"urn:mace:incommon:iap:silver", "urn:mace:incommon:iap:bronze",
+				},
+				SubjectTypesSupported: []string{
+					SubjectTypePublic, SubjectTypePairwise,
+				},
+				UserInfoOptions: JWAValuesSupported{
+					SigningAlgs:    []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
+					EncryptionAlgs: []string{"RSA1_5", "A128KW"},
+					EncryptionEncs: []string{"A128CBC-HS256", "A128GCM"},
+				},
+				IDTokenOptions: JWAValuesSupported{
+					SigningAlgs:    []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
+					EncryptionAlgs: []string{"RSA1_5", "A128KW"},
+					EncryptionEncs: []string{"A128CBC-HS256", "A128GCM"},
+				},
+				RequestObjectOptions: JWAValuesSupported{
+					SigningAlgs: []string{jose.AlgNone, jose.AlgRS256, jose.AlgES256},
+				},
+				DisplayValuesSupported: []string{"page", "popup"},
+				ClaimTypesSupported:    []string{"normal", "distributed"},
+				ClaimsSupported: []string{
+					"sub", "iss", "auth_time", "acr", "name", "given_name",
+					"family_name", "nickname", "profile", "picture", "website",
+					"email", "email_verified", "locale", "zoneinfo",
+					"http://example.info/claims/groups",
+				},
+				ClaimsParameterSupported: true,
+				ServiceDocs:              uri("/connect/service_documentation.html"),
+				UILocalsSupported:        []string{"en-US", "en-GB", "en-CA", "fr-FR", "fr-CA"},
+			},
+			wantErr: false,
+		},
+		{
+			// missing a lot of required field
+			data:    `{}`,
+			wantErr: true,
+		},
+		{
+			data: `{
+				"issuer": "https://server.example.com",
+				"authorization_endpoint": "https://server.example.com/connect/authorize",
+				"token_endpoint": "https://server.example.com/connect/token",
+				"jwks_uri": "https://server.example.com/jwks.json",
+				"response_types_supported": [
+					"code", "code id_token", "id_token", "id_token token"
+				],
+				"subject_types_supported": ["public", "pairwise"],
+				"id_token_signing_alg_values_supported": ["RS256", "ES256", "HS256"]
+			}
+			`,
+			want: ProviderConfig{
+				Issuer:        &url.URL{Scheme: "https", Host: "server.example.com"},
+				AuthEndpoint:  uri("/connect/authorize"),
+				TokenEndpoint: uri("/connect/token"),
+				KeysEndpoint:  uri("/jwks.json"),
+				ResponseTypesSupported: []string{
+					oauth2.ResponseTypeCode, oauth2.ResponseTypeCodeIDToken,
+					oauth2.ResponseTypeIDToken, oauth2.ResponseTypeIDTokenToken,
+				},
+				SubjectTypesSupported: []string{
+					SubjectTypePublic, SubjectTypePairwise,
+				},
+				IDTokenOptions: JWAValuesSupported{
+					SigningAlgs: []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			// invalid scheme 'ftp://'
+			data: `{
+				"issuer": "https://server.example.com",
+				"authorization_endpoint": "https://server.example.com/connect/authorize",
+				"token_endpoint": "https://server.example.com/connect/token",
+				"jwks_uri": "ftp://server.example.com/jwks.json",
+				"response_types_supported": [
+					"code", "code id_token", "id_token", "id_token token"
+				],
+				"subject_types_supported": ["public", "pairwise"],
+				"id_token_signing_alg_values_supported": ["RS256", "ES256", "HS256"]
+			}
+			`,
+			wantErr: true,
+		},
+	}
+	for i, tt := range tests {
+		var got ProviderConfig
+		if err := json.Unmarshal([]byte(tt.data), &got); err != nil {
+			if !tt.wantErr {
+				t.Errorf("case %d: failed to unmarshal provider config: %v", i, err)
+			}
+			continue
+		}
+		if tt.wantErr {
+			t.Errorf("case %d: expected error", i)
+			continue
+		}
+		if !reflect.DeepEqual(tt.want, got) {
+			t.Errorf("case %d: unmarshaled struct did not match expected", i)
+		}
+	}
+
+}
+
+func TestProviderConfigMarshalRoundTrip(t *testing.T) {
+	tests := []struct {
+		cfg ProviderConfig
+	}{
+		// provider configs will be supplemented with required fields later on in the test
+		{
+			cfg: ProviderConfig{},
+		},
+		{
+			cfg: ProviderConfig{
+				UserInfoEndpoint:       &url.URL{Scheme: "https", Host: "example.com", Path: "/u"},
+				RegistrationEndpoint:   &url.URL{Scheme: "https", Host: "example.com", Path: "/r"},
+				ScopesSupported:        DefaultScope,
+				ResponseModesSupported: DefaultResponseModesSupported,
+				GrantTypesSupported:    []string{oauth2.GrantTypeAuthCode},
+				ServiceDocs:            &url.URL{Scheme: "https", Host: "example.com", Path: "/d"},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		// fill provider config with enough data to be valid
+		tt.cfg = fillRequiredProviderFields(tt.cfg)
+
+		data, err := json.Marshal(&tt.cfg)
+		if err != nil {
+			t.Errorf("case %d: failed to marshal config: %v", i, err)
+			continue
+		}
+		var got ProviderConfig
+		if err := json.Unmarshal(data, &got); err != nil {
+			t.Errorf("case %d: failed to unmarshal config: %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(tt.cfg, got) {
+			t.Errorf("case %d: config is different after marshaling and unmarshaling", i)
+		}
+	}
+}
+
+func TestProviderConfigSupports(t *testing.T) {
+	tests := []struct {
+		provider                   ProviderConfig
+		client                     ClientMetadata
+		fillRequiredProviderFields bool
+		ok                         bool
+	}{
+		{
+			provider: ProviderConfig{},
+			client: ClientMetadata{
+				RedirectURIs: []*url.URL{
+					{Scheme: "https", Host: "example.com", Path: "/callback"},
+				},
+			},
+			fillRequiredProviderFields: true,
+			ok: true,
+		},
+		{
+			// invalid provider config
+			provider: ProviderConfig{},
+			client: ClientMetadata{
+				RedirectURIs: []*url.URL{
+					{Scheme: "https", Host: "example.com", Path: "/callback"},
+				},
+			},
+			fillRequiredProviderFields: false,
+			ok: false,
+		},
+		{
+			// invalid client config
+			provider: ProviderConfig{},
+			client:   ClientMetadata{},
+			fillRequiredProviderFields: true,
+			ok: false,
+		},
+	}
+
+	for i, tt := range tests {
+		if tt.fillRequiredProviderFields {
+			tt.provider = fillRequiredProviderFields(tt.provider)
+		}
+
+		err := tt.provider.Supports(tt.client)
+		if err == nil && !tt.ok {
+			t.Errorf("case %d: expected non-nil error", i)
+		}
+		if err != nil && tt.ok {
+			t.Errorf("case %d: supports failed: %v", i, err)
+		}
+	}
+}
+
+func newValidProviderConfig() ProviderConfig {
+	var cfg ProviderConfig
+	return fillRequiredProviderFields(cfg)
+}
+
+// fill a provider config with enough information to be valid
+func fillRequiredProviderFields(cfg ProviderConfig) ProviderConfig {
+	if cfg.Issuer == nil {
+		cfg.Issuer = &url.URL{Scheme: "https", Host: "auth.example.com"}
+	}
+	urlPath := func(path string) *url.URL {
+		var u url.URL
+		u = *cfg.Issuer
+		u.Path = path
+		return &u
+	}
+	cfg.AuthEndpoint = urlPath("/auth")
+	cfg.TokenEndpoint = urlPath("/token")
+	cfg.UserInfoEndpoint = urlPath("/userinfo")
+	cfg.KeysEndpoint = urlPath("/jwk")
+	cfg.ResponseTypesSupported = []string{oauth2.ResponseTypeCode}
+	cfg.SubjectTypesSupported = []string{SubjectTypePublic}
+	cfg.IDTokenOptions.SigningAlgs = []string{jose.AlgRS256}
+	return cfg
+}
 
 type fakeProviderConfigGetterSetter struct {
 	cfg      *ProviderConfig
@@ -41,7 +366,7 @@ type fakeProviderConfigHandler struct {
 }
 
 func (s *fakeProviderConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	b, _ := json.Marshal(s.cfg)
+	b, _ := json.Marshal(&s.cfg)
 	if s.maxAge.Seconds() >= 0 {
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(s.maxAge.Seconds())))
 	}
@@ -64,11 +389,12 @@ func TestProviderConfigRequiredFields(t *testing.T) {
 
 	svr := &fakeProviderConfigHandler{
 		cfg: ProviderConfig{
-			Issuer:    "https://example.com",
+			Issuer:    &url.URL{Scheme: "http", Host: "example.com"},
 			ExpiresAt: time.Now().Add(time.Minute),
 		},
 		maxAge: time.Minute,
 	}
+	svr.cfg = fillRequiredProviderFields(svr.cfg)
 	s := httptest.NewServer(svr)
 	defer s.Close()
 
@@ -107,7 +433,7 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 			dsc: "https://example.com",
 			age: time.Minute,
 			cfg: ProviderConfig{
-				Issuer:    "https://example.com",
+				Issuer:    &url.URL{Scheme: "https", Host: "example.com"},
 				ExpiresAt: now.Add(time.Minute),
 			},
 			ok: true,
@@ -117,7 +443,7 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 			dsc: "https://example.com",
 			age: time.Minute,
 			cfg: ProviderConfig{
-				Issuer:    "example.com",
+				Issuer:    &url.URL{Scheme: "https", Host: "example.com"},
 				ExpiresAt: now.Add(time.Minute),
 			},
 			ok: true,
@@ -127,7 +453,7 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 			dsc: "https://foo.com",
 			age: time.Minute,
 			cfg: ProviderConfig{
-				Issuer:    "https://example.com",
+				Issuer:    &url.URL{Scheme: "https", Host: "example.com"},
 				ExpiresAt: now.Add(time.Minute),
 			},
 			ok: false,
@@ -137,13 +463,14 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 			dsc: "https://example.com",
 			age: -1,
 			cfg: ProviderConfig{
-				Issuer: "https://example.com",
+				Issuer: &url.URL{Scheme: "https", Host: "example.com"},
 			},
 			ok: true,
 		},
 	}
 
 	for i, tt := range tests {
+		tt.cfg = fillRequiredProviderFields(tt.cfg)
 		svr.cfg = tt.cfg
 		svr.maxAge = tt.age
 		getter := NewHTTPProviderConfigGetter(hc, tt.dsc)
@@ -152,28 +479,28 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 		got, err := getter.Get()
 		if err != nil {
 			if tt.ok {
-				t.Fatalf("test %d: unexpected error: %v", i, err)
+				t.Errorf("test %d: unexpected error: %v", i, err)
 			}
 			continue
 		}
 
 		if !tt.ok {
-			t.Fatalf("test %d: expected error", i)
+			t.Errorf("test %d: expected error", i)
 			continue
 		}
 
 		if !reflect.DeepEqual(tt.cfg, got) {
-			t.Fatalf("test %d: want: %#v, got: %#v", i, tt.cfg, got)
+			t.Errorf("test %d: want: %#v, got: %#v", i, tt.cfg, got)
 		}
 	}
 }
 
 func TestProviderConfigSyncerRun(t *testing.T) {
 	c1 := &ProviderConfig{
-		Issuer: "http://first.example.com",
+		Issuer: &url.URL{Scheme: "https", Host: "example.com"},
 	}
 	c2 := &ProviderConfig{
-		Issuer: "http://second.example.com",
+		Issuer: &url.URL{Scheme: "https", Host: "example.com"},
 	}
 
 	tests := []struct {
@@ -367,7 +694,9 @@ func TestProviderConfigEmpty(t *testing.T) {
 	if !cfg.Empty() {
 		t.Fatalf("Empty provider config reports non-empty")
 	}
-	cfg = ProviderConfig{Issuer: "http://example.com"}
+	cfg = ProviderConfig{
+		Issuer: &url.URL{Scheme: "https", Host: "example.com"},
+	}
 	if cfg.Empty() {
 		t.Fatalf("Non-empty provider config reports empty")
 	}
@@ -480,8 +809,8 @@ func TestProviderConfigSupportsGrantType(t *testing.T) {
 }
 
 func TestWaitForProviderConfigImmediateSuccess(t *testing.T) {
-	cfg := ProviderConfig{Issuer: "http://example.com"}
-	b, err := json.Marshal(cfg)
+	cfg := newValidProviderConfig()
+	b, err := json.Marshal(&cfg)
 	if err != nil {
 		t.Fatalf("Failed marshaling provider config")
 	}
@@ -492,7 +821,7 @@ func TestWaitForProviderConfigImmediateSuccess(t *testing.T) {
 
 	reschan := make(chan ProviderConfig)
 	go func() {
-		reschan <- waitForProviderConfig(hc, cfg.Issuer, fc)
+		reschan <- waitForProviderConfig(hc, cfg.Issuer.String(), fc)
 	}()
 
 	var got ProviderConfig
