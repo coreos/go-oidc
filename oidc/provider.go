@@ -193,7 +193,7 @@ type encodableProviderConfig struct {
 	DisplayValuesSupported        []string `json:"display_values_supported,omitempty"`
 	ClaimTypesSupported           []string `json:"claim_types_supported,omitempty"`
 	ClaimsSupported               []string `json:"claims_supported,omitempty"`
-	ServiceDocs                   string   `json:"service_documentation"`
+	ServiceDocs                   string   `json:"service_documentation,omitempty"`
 	ClaimsLocalsSupported         []string `json:"claims_locales_supported,omitempty"`
 	UILocalsSupported             []string `json:"ui_locales_supported,omitempty"`
 	ClaimsParameterSupported      bool     `json:"claims_parameter_supported,omitempty"`
