@@ -78,7 +78,7 @@ var (
 	_ json.Unmarshaler = &ClientMetadata{}
 )
 
-// ClientMetadata holds matedata that the authorization server associates
+// ClientMetadata holds metadata that the authorization server associates
 // with a client identifier. The fields range from human-facing display
 // strings such as client name, to items that impact the security of the
 // protocol, such as the list of valid redirect URIs.
