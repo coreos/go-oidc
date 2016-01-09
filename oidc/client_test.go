@@ -11,6 +11,7 @@ import (
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/key"
 	"github.com/coreos/go-oidc/oauth2"
+	"github.com/kylelemons/godebug/pretty"
 )
 
 func TestNewClientScopeDefault(t *testing.T) {
@@ -476,8 +477,8 @@ func TestClientMetadataUnmarshal(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(tt.want, got) {
-			t.Errorf("case %d: results not equal", i)
+		if diff := pretty.Compare(tt.want, got); diff != "" {
+			t.Errorf("case %d: results not equal: %s", i, diff)
 		}
 	}
 }
@@ -549,8 +550,8 @@ func TestClientMetadataMarshalRoundTrip(t *testing.T) {
 			t.Errorf("case %d: failed to unmarshal metadata: %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(want, got) {
-			t.Errorf("case %d: struct did not survive a marshaling round trip", i)
+		if diff := pretty.Compare(want, got); diff != "" {
+			t.Errorf("case %d: struct did not survive a marshaling round trip: %s", i, diff)
 		}
 	}
 }
@@ -641,8 +642,8 @@ func TestClientRegistrationResponseUnmarshal(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(tt.want, got) {
-			t.Errorf("case %d: results not equal", i)
+		if diff := pretty.Compare(tt.want, got); diff != "" {
+			t.Errorf("case %d: results not equal: %s", i, diff)
 		}
 		if tt.secretExpires && got.ClientSecretExpiresAt.IsZero() {
 			t.Errorf("case %d: expected client_secret to expire, but it doesn't", i)

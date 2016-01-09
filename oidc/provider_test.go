@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/kylelemons/godebug/diff"
+	"github.com/kylelemons/godebug/pretty"
 
 	phttp "github.com/coreos/go-oidc/http"
 	"github.com/coreos/go-oidc/jose"
@@ -38,8 +40,8 @@ func TestProviderConfigDefaults(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if !reflect.DeepEqual(tt.want, tt.got) {
-			t.Errorf("%s: want=%s, got=%s", tt.name, tt.want, tt.got)
+		if diff := pretty.Compare(tt.want, tt.got); diff != "" {
+			t.Errorf("%s: did not match %s", tt.name, diff)
 		}
 	}
 }
@@ -218,51 +220,140 @@ func TestProviderConfigUnmarshal(t *testing.T) {
 			t.Errorf("case %d: expected error", i)
 			continue
 		}
-		if !reflect.DeepEqual(tt.want, got) {
-			t.Errorf("case %d: unmarshaled struct did not match expected", i)
+		if diff := pretty.Compare(tt.want, got); diff != "" {
+			t.Errorf("case %d: unmarshaled struct did not match expected %s", i, diff)
 		}
 	}
 
 }
 
-func TestProviderConfigMarshalRoundTrip(t *testing.T) {
+func TestProviderConfigMarshal(t *testing.T) {
 	tests := []struct {
-		cfg ProviderConfig
+		cfg  ProviderConfig
+		want string
 	}{
-		// provider configs will be supplemented with required fields later on in the test
 		{
-			cfg: ProviderConfig{},
+			cfg: ProviderConfig{
+				Issuer: &url.URL{Scheme: "https", Host: "auth.example.com"},
+				AuthEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/auth",
+				},
+				TokenEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/token",
+				},
+				UserInfoEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/userinfo",
+				},
+				KeysEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/jwk",
+				},
+				ResponseTypesSupported: []string{oauth2.ResponseTypeCode},
+				SubjectTypesSupported:  []string{SubjectTypePublic},
+				IDTokenOptions: JWAValuesSupported{
+					SigningAlgs: []string{jose.AlgRS256},
+				},
+			},
+			// spacing must match json.MarshalIndent(cfg, "", "\t")
+			want: `{
+	"issuer": "https://auth.example.com",
+	"authorization_endpoint": "https://auth.example.com/auth",
+	"token_endpoint": "https://auth.example.com/token",
+	"userinfo_endpoint": "https://auth.example.com/userinfo",
+	"jwks_uri": "https://auth.example.com/jwk",
+	"response_types_supported": [
+		"code"
+	],
+	"subject_types_supported": [
+		"public"
+	],
+	"id_token_signing_alg_values_supported": [
+		"RS256"
+	]
+}`,
 		},
 		{
 			cfg: ProviderConfig{
-				UserInfoEndpoint:       &url.URL{Scheme: "https", Host: "example.com", Path: "/u"},
-				RegistrationEndpoint:   &url.URL{Scheme: "https", Host: "example.com", Path: "/r"},
+				Issuer: &url.URL{Scheme: "https", Host: "auth.example.com"},
+				AuthEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/auth",
+				},
+				TokenEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/token",
+				},
+				UserInfoEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/userinfo",
+				},
+				KeysEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/jwk",
+				},
+				RegistrationEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/register",
+				},
 				ScopesSupported:        DefaultScope,
+				ResponseTypesSupported: []string{oauth2.ResponseTypeCode},
 				ResponseModesSupported: DefaultResponseModesSupported,
 				GrantTypesSupported:    []string{oauth2.GrantTypeAuthCode},
-				ServiceDocs:            &url.URL{Scheme: "https", Host: "example.com", Path: "/d"},
+				SubjectTypesSupported:  []string{SubjectTypePublic},
+				IDTokenOptions: JWAValuesSupported{
+					SigningAlgs: []string{jose.AlgRS256},
+				},
+				ServiceDocs: &url.URL{Scheme: "https", Host: "example.com", Path: "/docs"},
 			},
+			// spacing must match json.MarshalIndent(cfg, "", "\t")
+			want: `{
+	"issuer": "https://auth.example.com",
+	"authorization_endpoint": "https://auth.example.com/auth",
+	"token_endpoint": "https://auth.example.com/token",
+	"userinfo_endpoint": "https://auth.example.com/userinfo",
+	"jwks_uri": "https://auth.example.com/jwk",
+	"registration_endpoint": "https://auth.example.com/register",
+	"scopes_supported": [
+		"openid",
+		"email",
+		"profile"
+	],
+	"response_types_supported": [
+		"code"
+	],
+	"response_modes_supported": [
+		"query",
+		"fragment"
+	],
+	"grant_types_supported": [
+		"authorization_code"
+	],
+	"subject_types_supported": [
+		"public"
+	],
+	"id_token_signing_alg_values_supported": [
+		"RS256"
+	],
+	"service_documentation": "https://example.com/docs"
+}`,
 		},
 	}
 
 	for i, tt := range tests {
-		// fill provider config with enough data to be valid
-		tt.cfg = fillRequiredProviderFields(tt.cfg)
-
-		data, err := json.Marshal(&tt.cfg)
+		got, err := json.MarshalIndent(&tt.cfg, "", "\t")
 		if err != nil {
 			t.Errorf("case %d: failed to marshal config: %v", i, err)
 			continue
 		}
-		var got ProviderConfig
-		if err := json.Unmarshal(data, &got); err != nil {
-			t.Errorf("case %d: failed to unmarshal config: %v", i, err)
+		if d := diff.Diff(string(got), string(tt.want)); d != "" {
+			t.Errorf("case %d: expected did not match result: %s", i, d)
+		}
+
+		var cfg ProviderConfig
+		if err := json.Unmarshal(got, &cfg); err != nil {
+			t.Errorf("case %d: could not unmarshal marshal response: %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(tt.cfg, got) {
-			t.Errorf("case %d: config is different after marshaling and unmarshaling", i)
+
+		if d := pretty.Compare(tt.cfg, cfg); d != "" {
+			t.Errorf("case %d: config did not survive JSON marshaling round trip: %s", i, d)
 		}
 	}
+
 }
 
 func TestProviderConfigSupports(t *testing.T) {
