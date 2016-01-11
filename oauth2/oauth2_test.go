@@ -13,6 +13,32 @@ import (
 	phttp "github.com/coreos/go-oidc/http"
 )
 
+func TestResponseTypesEqual(t *testing.T) {
+	tests := []struct {
+		r1, r2 string
+		want   bool
+	}{
+		{"code", "code", true},
+		{"id_token", "code", false},
+		{"code token", "token code", true},
+		{"code token", "code token", true},
+		{"foo", "bar code", false},
+		{"code token id_token", "token id_token code", true},
+		{"code token id_token", "token id_token code zoo", false},
+	}
+
+	for i, tt := range tests {
+		got1 := ResponseTypesEqual(tt.r1, tt.r2)
+		got2 := ResponseTypesEqual(tt.r2, tt.r1)
+		if got1 != got2 {
+			t.Errorf("case %d: got different answers with different orders", i)
+		}
+		if tt.want != got1 {
+			t.Errorf("case %d: want=%t, got=%t", i, tt.want, got1)
+		}
+	}
+}
+
 func TestParseAuthCodeRequest(t *testing.T) {
 	tests := []struct {
 		query   url.Values
