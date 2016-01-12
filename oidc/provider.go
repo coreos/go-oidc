@@ -51,12 +51,6 @@ const (
 // internally configurable for tests
 var minimumProviderConfigSyncInterval = MinimumProviderConfigSyncInterval
 
-type JWAValuesSupported struct {
-	SigningAlgs    []string
-	EncryptionAlgs []string
-	EncryptionEncs []string
-}
-
 var (
 	// Ensure ProviderConfig satisfies these interfaces.
 	_ json.Marshaler   = &ProviderConfig{}
@@ -92,9 +86,20 @@ type ProviderConfig struct {
 	// SubjectTypesSupported specifies strategies for providing values for the sub claim.
 	SubjectTypesSupported []string // Required
 
-	IDTokenOptions       JWAValuesSupported // SigningAlgs required
-	UserInfoOptions      JWAValuesSupported
-	RequestObjectOptions JWAValuesSupported
+	// JWA signing and encryption algorith values supported for ID tokens.
+	IDTokenSigningAlgValues    []string // Required
+	IDTokenEncryptionAlgValues []string
+	IDTokenEncryptionEncValues []string
+
+	// JWA signing and encryption algorith values supported for user info responses.
+	UserInfoSigningAlgValues    []string
+	UserInfoEncryptionAlgValues []string
+	UserInfoEncryptionEncValues []string
+
+	// JWA signing and encryption algorith values supported for request objects.
+	ReqObjSigningAlgValues    []string
+	ReqObjEncryptionAlgValues []string
+	ReqObjEncryptionEncValues []string
 
 	TokenEndpointAuthMethodsSupported          []string
 	TokenEndpointAuthSigningAlgValuesSupported []string
@@ -219,6 +224,15 @@ func (cfg ProviderConfig) toEncodableStruct() encodableProviderConfig {
 		GrantTypesSupported:                        cfg.GrantTypesSupported,
 		ACRValuesSupported:                         cfg.ACRValuesSupported,
 		SubjectTypesSupported:                      cfg.SubjectTypesSupported,
+		IDTokenSigningAlgValues:                    cfg.IDTokenSigningAlgValues,
+		IDTokenEncryptionAlgValues:                 cfg.IDTokenEncryptionAlgValues,
+		IDTokenEncryptionEncValues:                 cfg.IDTokenEncryptionEncValues,
+		UserInfoSigningAlgValues:                   cfg.UserInfoSigningAlgValues,
+		UserInfoEncryptionAlgValues:                cfg.UserInfoEncryptionAlgValues,
+		UserInfoEncryptionEncValues:                cfg.UserInfoEncryptionEncValues,
+		ReqObjSigningAlgValues:                     cfg.ReqObjSigningAlgValues,
+		ReqObjEncryptionAlgValues:                  cfg.ReqObjEncryptionAlgValues,
+		ReqObjEncryptionEncValues:                  cfg.ReqObjEncryptionEncValues,
 		TokenEndpointAuthMethodsSupported:          cfg.TokenEndpointAuthMethodsSupported,
 		TokenEndpointAuthSigningAlgValuesSupported: cfg.TokenEndpointAuthSigningAlgValuesSupported,
 		DisplayValuesSupported:                     cfg.DisplayValuesSupported,
@@ -231,17 +245,8 @@ func (cfg ProviderConfig) toEncodableStruct() encodableProviderConfig {
 		RequestParameterSupported:                  cfg.RequestParameterSupported,
 		RequestURIParamaterSupported:               cfg.RequestURIParamaterSupported,
 		RequireRequestURIRegistration:              cfg.RequireRequestURIRegistration,
-		Policy:                      uriToString(cfg.Policy),
-		TermsOfService:              uriToString(cfg.TermsOfService),
-		IDTokenSigningAlgValues:     cfg.IDTokenOptions.SigningAlgs,
-		IDTokenEncryptionAlgValues:  cfg.IDTokenOptions.EncryptionAlgs,
-		IDTokenEncryptionEncValues:  cfg.IDTokenOptions.EncryptionEncs,
-		UserInfoSigningAlgValues:    cfg.UserInfoOptions.SigningAlgs,
-		UserInfoEncryptionAlgValues: cfg.UserInfoOptions.EncryptionAlgs,
-		UserInfoEncryptionEncValues: cfg.UserInfoOptions.EncryptionEncs,
-		ReqObjSigningAlgValues:      cfg.RequestObjectOptions.SigningAlgs,
-		ReqObjEncryptionAlgValues:   cfg.RequestObjectOptions.EncryptionAlgs,
-		ReqObjEncryptionEncValues:   cfg.RequestObjectOptions.EncryptionEncs,
+		Policy:         uriToString(cfg.Policy),
+		TermsOfService: uriToString(cfg.TermsOfService),
 	}
 }
 
@@ -260,6 +265,15 @@ func (e encodableProviderConfig) toStruct() (ProviderConfig, error) {
 		GrantTypesSupported:                        e.GrantTypesSupported,
 		ACRValuesSupported:                         e.ACRValuesSupported,
 		SubjectTypesSupported:                      e.SubjectTypesSupported,
+		IDTokenSigningAlgValues:                    e.IDTokenSigningAlgValues,
+		IDTokenEncryptionAlgValues:                 e.IDTokenEncryptionAlgValues,
+		IDTokenEncryptionEncValues:                 e.IDTokenEncryptionEncValues,
+		UserInfoSigningAlgValues:                   e.UserInfoSigningAlgValues,
+		UserInfoEncryptionAlgValues:                e.UserInfoEncryptionAlgValues,
+		UserInfoEncryptionEncValues:                e.UserInfoEncryptionEncValues,
+		ReqObjSigningAlgValues:                     e.ReqObjSigningAlgValues,
+		ReqObjEncryptionAlgValues:                  e.ReqObjEncryptionAlgValues,
+		ReqObjEncryptionEncValues:                  e.ReqObjEncryptionEncValues,
 		TokenEndpointAuthMethodsSupported:          e.TokenEndpointAuthMethodsSupported,
 		TokenEndpointAuthSigningAlgValuesSupported: e.TokenEndpointAuthSigningAlgValuesSupported,
 		DisplayValuesSupported:                     e.DisplayValuesSupported,
@@ -274,21 +288,6 @@ func (e encodableProviderConfig) toStruct() (ProviderConfig, error) {
 		RequireRequestURIRegistration:              e.RequireRequestURIRegistration,
 		Policy:         p.parseURI(e.Policy, "op_policy-uri"),
 		TermsOfService: p.parseURI(e.TermsOfService, "op_tos_uri"),
-		IDTokenOptions: JWAValuesSupported{
-			SigningAlgs:    e.IDTokenSigningAlgValues,
-			EncryptionAlgs: e.IDTokenEncryptionAlgValues,
-			EncryptionEncs: e.IDTokenEncryptionEncValues,
-		},
-		UserInfoOptions: JWAValuesSupported{
-			SigningAlgs:    e.UserInfoSigningAlgValues,
-			EncryptionAlgs: e.UserInfoEncryptionAlgValues,
-			EncryptionEncs: e.UserInfoEncryptionEncValues,
-		},
-		RequestObjectOptions: JWAValuesSupported{
-			SigningAlgs:    e.ReqObjSigningAlgValues,
-			EncryptionAlgs: e.ReqObjEncryptionAlgValues,
-			EncryptionEncs: e.ReqObjEncryptionEncValues,
-		},
 	}
 	if p.firstErr != nil {
 		return ProviderConfig{}, p.firstErr
@@ -338,7 +337,7 @@ func (p ProviderConfig) Valid() error {
 	if len(p.SubjectTypesSupported) == 0 {
 		return errors.New("missing required field subject_types_supported")
 	}
-	if len(p.IDTokenOptions.SigningAlgs) == 0 {
+	if len(p.IDTokenSigningAlgValues) == 0 {
 		return errors.New("missing required field id_token_signing_alg_values_supported")
 	}
 
@@ -346,7 +345,7 @@ func (p ProviderConfig) Valid() error {
 		return errors.New("scoped_supported must be unspecified or include 'openid'")
 	}
 
-	if !contains(p.IDTokenOptions.SigningAlgs, "RS256") {
+	if !contains(p.IDTokenSigningAlgValues, "RS256") {
 		return errors.New("id_token_signing_alg_values_supported must include 'RS256'")
 	}
 	if contains(p.TokenEndpointAuthMethodsSupported, "none") {
@@ -405,15 +404,15 @@ func (p ProviderConfig) Supports(c ClientMetadata) error {
 		requested string
 		name      string
 	}{
-		{p.IDTokenOptions.SigningAlgs, c.IDTokenResponseOptions.SigningAlg, "id_token_signed_response_alg"},
-		{p.IDTokenOptions.EncryptionAlgs, c.IDTokenResponseOptions.EncryptionAlg, "id_token_encryption_response_alg"},
-		{p.IDTokenOptions.EncryptionEncs, c.IDTokenResponseOptions.EncryptionEnc, "id_token_encryption_response_enc"},
-		{p.UserInfoOptions.SigningAlgs, c.UserInfoResponseOptions.SigningAlg, "userinfo_signed_response_alg"},
-		{p.UserInfoOptions.EncryptionAlgs, c.UserInfoResponseOptions.EncryptionAlg, "userinfo_encryption_response_alg"},
-		{p.UserInfoOptions.EncryptionEncs, c.UserInfoResponseOptions.EncryptionEnc, "userinfo_encryption_response_enc"},
-		{p.RequestObjectOptions.SigningAlgs, c.RequestObjectOptions.SigningAlg, "request_object_signing_alg"},
-		{p.RequestObjectOptions.EncryptionAlgs, c.RequestObjectOptions.EncryptionAlg, "request_object_encryption_alg"},
-		{p.RequestObjectOptions.EncryptionEncs, c.RequestObjectOptions.EncryptionEnc, "request_object_encryption_enc"},
+		{p.IDTokenSigningAlgValues, c.IDTokenResponseOptions.SigningAlg, "id_token_signed_response_alg"},
+		{p.IDTokenEncryptionAlgValues, c.IDTokenResponseOptions.EncryptionAlg, "id_token_encryption_response_alg"},
+		{p.IDTokenEncryptionEncValues, c.IDTokenResponseOptions.EncryptionEnc, "id_token_encryption_response_enc"},
+		{p.UserInfoSigningAlgValues, c.UserInfoResponseOptions.SigningAlg, "userinfo_signed_response_alg"},
+		{p.UserInfoEncryptionAlgValues, c.UserInfoResponseOptions.EncryptionAlg, "userinfo_encryption_response_alg"},
+		{p.UserInfoEncryptionEncValues, c.UserInfoResponseOptions.EncryptionEnc, "userinfo_encryption_response_enc"},
+		{p.ReqObjSigningAlgValues, c.RequestObjectOptions.SigningAlg, "request_object_signing_alg"},
+		{p.ReqObjEncryptionAlgValues, c.RequestObjectOptions.EncryptionAlg, "request_object_encryption_alg"},
+		{p.ReqObjEncryptionEncValues, c.RequestObjectOptions.EncryptionEnc, "request_object_encryption_enc"},
 	}
 	for _, field := range supports {
 		if field.requested == "" {
