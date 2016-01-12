@@ -238,19 +238,19 @@ func TestClientMetadataValid(t *testing.T) {
 	tests := []ClientMetadata{
 		// one RedirectURL
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "http", Host: "example.com"}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "http", Host: "example.com"}},
 		},
 
 		// one RedirectURL w/ nonempty path
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "http", Host: "example.com", Path: "/foo"}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "http", Host: "example.com", Path: "/foo"}},
 		},
 
 		// two RedirectURIs
 		ClientMetadata{
-			RedirectURIs: []*url.URL{
-				&url.URL{Scheme: "http", Host: "foo.example.com"},
-				&url.URL{Scheme: "http", Host: "bar.example.com"},
+			RedirectURIs: []url.URL{
+				url.URL{Scheme: "http", Host: "foo.example.com"},
+				url.URL{Scheme: "http", Host: "bar.example.com"},
 			},
 		},
 	}
@@ -271,48 +271,48 @@ func TestClientMetadataInvalid(t *testing.T) {
 
 		// empty RedirectURIs slice
 		ClientMetadata{
-			RedirectURIs: []*url.URL{},
+			RedirectURIs: []url.URL{},
 		},
 
 		// empty url.URL
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{}},
+			RedirectURIs: []url.URL{url.URL{}},
 		},
 
 		// empty url.URL following OK item
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "http", Host: "example.com"}, &url.URL{}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "http", Host: "example.com"}, url.URL{}},
 		},
 
 		// url.URL with empty Host
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "http", Host: ""}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "http", Host: ""}},
 		},
 
 		// url.URL with empty Scheme
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "", Host: "example.com"}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "", Host: "example.com"}},
 		},
 
 		// url.URL with non-HTTP(S) Scheme
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "tcp", Host: "127.0.0.1"}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "tcp", Host: "127.0.0.1"}},
 		},
 
 		// EncryptionEnc without EncryptionAlg
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "http", Host: "example.com"}},
+			RedirectURIs: []url.URL{url.URL{Scheme: "http", Host: "example.com"}},
 			IDTokenResponseOptions: JWAOptions{
 				EncryptionEnc: "A128CBC-HS256",
 			},
 		},
 
-		// List of URIs with one nil element
+		// List of URIs with one empty element
 		ClientMetadata{
-			RedirectURIs: []*url.URL{&url.URL{Scheme: "http", Host: "example.com"}},
-			RequestURIs: []*url.URL{
-				&url.URL{Scheme: "http", Host: "example.com"},
-				nil,
+			RedirectURIs: []url.URL{url.URL{Scheme: "http", Host: "example.com"}},
+			RequestURIs: []url.URL{
+				url.URL{Scheme: "http", Host: "example.com"},
+				url.URL{},
 			},
 		},
 	}
@@ -388,7 +388,7 @@ func TestClientMetadataUnmarshal(t *testing.T) {
 		{
 			`{"redirect_uris":["https://example.com"]}`,
 			ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com"},
 				},
 			},
@@ -409,10 +409,10 @@ func TestClientMetadataUnmarshal(t *testing.T) {
 		{
 			`{"redirect_uris":["https://example.com"],"contacts":["Ms. Foo <foo@example.com>"]}`,
 			ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com"},
 				},
-				Contacts: []*mail.Address{
+				Contacts: []mail.Address{
 					{Name: "Ms. Foo", Address: "foo@example.com"},
 				},
 			},
@@ -440,14 +440,14 @@ func TestClientMetadataUnmarshal(t *testing.T) {
 				]
 			}`,
 			ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com"},
 				},
 				UserInfoResponseOptions: JWAOptions{
 					EncryptionAlg: "RSA1_5",
 					EncryptionEnc: "A128CBC-HS256",
 				},
-				Contacts: []*mail.Address{
+				Contacts: []mail.Address{
 					{Name: "jane doe", Address: "jane.doe@example.com"},
 					{Name: "john doe", Address: "john.doe@example.com"},
 				},
@@ -491,7 +491,7 @@ func TestClientMetadataMarshal(t *testing.T) {
 	}{
 		{
 			ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com", Path: "/callback"},
 				},
 			},
@@ -499,7 +499,7 @@ func TestClientMetadataMarshal(t *testing.T) {
 		},
 		{
 			ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com", Path: "/callback"},
 				},
 				RequestObjectOptions: JWAOptions{
@@ -526,7 +526,7 @@ func TestClientMetadataMarshal(t *testing.T) {
 func TestClientMetadataMarshalRoundTrip(t *testing.T) {
 	tests := []ClientMetadata{
 		{
-			RedirectURIs: []*url.URL{
+			RedirectURIs: []url.URL{
 				{Scheme: "https", Host: "example.com", Path: "/callback"},
 			},
 			LogoURI: &url.URL{Scheme: "https", Host: "example.com", Path: "/logo"},
@@ -579,7 +579,7 @@ func TestClientRegistrationResponseUnmarshal(t *testing.T) {
 				ClientSecret:          "bar",
 				ClientSecretExpiresAt: time.Unix(1577858400, 0),
 				ClientMetadata: ClientMetadata{
-					RedirectURIs: []*url.URL{
+					RedirectURIs: []url.URL{
 						{Scheme: "https", Host: "client.example.org", Path: "/callback"},
 						{Scheme: "https", Host: "client.example.org", Path: "/callback2"},
 					},
@@ -602,7 +602,7 @@ func TestClientRegistrationResponseUnmarshal(t *testing.T) {
 			ClientRegistrationResponse{
 				ClientID: "foo",
 				ClientMetadata: ClientMetadata{
-					RedirectURIs: []*url.URL{
+					RedirectURIs: []url.URL{
 						{Scheme: "https", Host: "client.example.org", Path: "/callback"},
 						{Scheme: "https", Host: "client.example.org", Path: "/callback2"},
 					},

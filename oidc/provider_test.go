@@ -128,21 +128,15 @@ func TestProviderConfigUnmarshal(t *testing.T) {
 				SubjectTypesSupported: []string{
 					SubjectTypePublic, SubjectTypePairwise,
 				},
-				UserInfoOptions: JWAValuesSupported{
-					SigningAlgs:    []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
-					EncryptionAlgs: []string{"RSA1_5", "A128KW"},
-					EncryptionEncs: []string{"A128CBC-HS256", "A128GCM"},
-				},
-				IDTokenOptions: JWAValuesSupported{
-					SigningAlgs:    []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
-					EncryptionAlgs: []string{"RSA1_5", "A128KW"},
-					EncryptionEncs: []string{"A128CBC-HS256", "A128GCM"},
-				},
-				RequestObjectOptions: JWAValuesSupported{
-					SigningAlgs: []string{jose.AlgNone, jose.AlgRS256, jose.AlgES256},
-				},
-				DisplayValuesSupported: []string{"page", "popup"},
-				ClaimTypesSupported:    []string{"normal", "distributed"},
+				UserInfoSigningAlgValues:    []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
+				UserInfoEncryptionAlgValues: []string{"RSA1_5", "A128KW"},
+				UserInfoEncryptionEncValues: []string{"A128CBC-HS256", "A128GCM"},
+				IDTokenSigningAlgValues:     []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
+				IDTokenEncryptionAlgValues:  []string{"RSA1_5", "A128KW"},
+				IDTokenEncryptionEncValues:  []string{"A128CBC-HS256", "A128GCM"},
+				ReqObjSigningAlgValues:      []string{jose.AlgNone, jose.AlgRS256, jose.AlgES256},
+				DisplayValuesSupported:      []string{"page", "popup"},
+				ClaimTypesSupported:         []string{"normal", "distributed"},
 				ClaimsSupported: []string{
 					"sub", "iss", "auth_time", "acr", "name", "given_name",
 					"family_name", "nickname", "profile", "picture", "website",
@@ -185,9 +179,7 @@ func TestProviderConfigUnmarshal(t *testing.T) {
 				SubjectTypesSupported: []string{
 					SubjectTypePublic, SubjectTypePairwise,
 				},
-				IDTokenOptions: JWAValuesSupported{
-					SigningAlgs: []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
-				},
+				IDTokenSigningAlgValues: []string{jose.AlgRS256, jose.AlgES256, jose.AlgHS256},
 			},
 			wantErr: false,
 		},
@@ -247,11 +239,9 @@ func TestProviderConfigMarshal(t *testing.T) {
 				KeysEndpoint: &url.URL{
 					Scheme: "https", Host: "auth.example.com", Path: "/jwk",
 				},
-				ResponseTypesSupported: []string{oauth2.ResponseTypeCode},
-				SubjectTypesSupported:  []string{SubjectTypePublic},
-				IDTokenOptions: JWAValuesSupported{
-					SigningAlgs: []string{jose.AlgRS256},
-				},
+				ResponseTypesSupported:  []string{oauth2.ResponseTypeCode},
+				SubjectTypesSupported:   []string{SubjectTypePublic},
+				IDTokenSigningAlgValues: []string{jose.AlgRS256},
 			},
 			// spacing must match json.MarshalIndent(cfg, "", "\t")
 			want: `{
@@ -289,15 +279,13 @@ func TestProviderConfigMarshal(t *testing.T) {
 				RegistrationEndpoint: &url.URL{
 					Scheme: "https", Host: "auth.example.com", Path: "/register",
 				},
-				ScopesSupported:        DefaultScope,
-				ResponseTypesSupported: []string{oauth2.ResponseTypeCode},
-				ResponseModesSupported: DefaultResponseModesSupported,
-				GrantTypesSupported:    []string{oauth2.GrantTypeAuthCode},
-				SubjectTypesSupported:  []string{SubjectTypePublic},
-				IDTokenOptions: JWAValuesSupported{
-					SigningAlgs: []string{jose.AlgRS256},
-				},
-				ServiceDocs: &url.URL{Scheme: "https", Host: "example.com", Path: "/docs"},
+				ScopesSupported:         DefaultScope,
+				ResponseTypesSupported:  []string{oauth2.ResponseTypeCode},
+				ResponseModesSupported:  DefaultResponseModesSupported,
+				GrantTypesSupported:     []string{oauth2.GrantTypeAuthCode},
+				SubjectTypesSupported:   []string{SubjectTypePublic},
+				IDTokenSigningAlgValues: []string{jose.AlgRS256},
+				ServiceDocs:             &url.URL{Scheme: "https", Host: "example.com", Path: "/docs"},
 			},
 			// spacing must match json.MarshalIndent(cfg, "", "\t")
 			want: `{
@@ -366,7 +354,7 @@ func TestProviderConfigSupports(t *testing.T) {
 		{
 			provider: ProviderConfig{},
 			client: ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com", Path: "/callback"},
 				},
 			},
@@ -377,7 +365,7 @@ func TestProviderConfigSupports(t *testing.T) {
 			// invalid provider config
 			provider: ProviderConfig{},
 			client: ClientMetadata{
-				RedirectURIs: []*url.URL{
+				RedirectURIs: []url.URL{
 					{Scheme: "https", Host: "example.com", Path: "/callback"},
 				},
 			},
@@ -430,7 +418,7 @@ func fillRequiredProviderFields(cfg ProviderConfig) ProviderConfig {
 	cfg.KeysEndpoint = urlPath("/jwk")
 	cfg.ResponseTypesSupported = []string{oauth2.ResponseTypeCode}
 	cfg.SubjectTypesSupported = []string{SubjectTypePublic}
-	cfg.IDTokenOptions.SigningAlgs = []string{jose.AlgRS256}
+	cfg.IDTokenSigningAlgValues = []string{jose.AlgRS256}
 	return cfg
 }
 
