@@ -88,7 +88,7 @@ var (
 // TODO: support language specific claim representations
 // http://openid.net/specs/openid-connect-registration-1_0.html#LanguagesAndScripts
 type ClientMetadata struct {
-	RedirectURIs []*url.URL // Required
+	RedirectURIs []url.URL // Required
 
 	// A list of OAuth 2.0 "response_type" values that the client wishes to restrict
 	// itself to. Either "code", "token", or another registered extension.
@@ -105,7 +105,7 @@ type ClientMetadata struct {
 	ApplicationType string
 
 	// List of email addresses.
-	Contacts []*mail.Address
+	Contacts []mail.Address
 	// Name of client to be presented to the end-user.
 	ClientName string
 	// URL that references a logo for the Client application.
@@ -152,7 +152,7 @@ type ClientMetadata struct {
 	// See: http://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin
 	InitiateLoginURI *url.URL
 	// Pre-registered request_uri values that may be cached by the server.
-	RequestURIs []*url.URL
+	RequestURIs []url.URL
 }
 
 // Defaults returns a shallow copy of ClientMetadata with default
@@ -301,37 +301,37 @@ func (p *stickyErrParser) parseURI(s, field string) *url.URL {
 	return u
 }
 
-func (p *stickyErrParser) parseURIs(s []string, field string) []*url.URL {
+func (p *stickyErrParser) parseURIs(s []string, field string) []url.URL {
 	if p.firstErr != nil || len(s) == 0 {
 		return nil
 	}
-	uris := make([]*url.URL, len(s))
+	uris := make([]url.URL, len(s))
 	for i, val := range s {
 		if val == "" {
 			p.firstErr = fmt.Errorf("invalid URI in field %s", field)
 			return nil
 		}
-		uris[i] = p.parseURI(val, field)
+		uris[i] = *(p.parseURI(val, field))
 	}
 	return uris
 }
 
-func (p *stickyErrParser) parseEmails(s []string, field string) []*mail.Address {
+func (p *stickyErrParser) parseEmails(s []string, field string) []mail.Address {
 	if p.firstErr != nil || len(s) == 0 {
 		return nil
 	}
-	addrs := make([]*mail.Address, len(s))
+	addrs := make([]mail.Address, len(s))
 	for i, addr := range s {
 		if addr == "" {
 			p.firstErr = fmt.Errorf("invalid email in field %s", field)
 			return nil
 		}
-		var err error
-		addrs[i], err = mail.ParseAddress(addr)
+		a, err := mail.ParseAddress(addr)
 		if err != nil {
 			p.firstErr = fmt.Errorf("invalid email in field %s: %v", field, err)
 			return nil
 		}
+		addrs[i] = *a
 	}
 	return addrs
 }
@@ -378,7 +378,7 @@ func uriToString(u *url.URL) string {
 	return u.String()
 }
 
-func urisToStrings(urls []*url.URL) []string {
+func urisToStrings(urls []url.URL) []string {
 	if len(urls) == 0 {
 		return nil
 	}
@@ -389,7 +389,7 @@ func urisToStrings(urls []*url.URL) []string {
 	return sli
 }
 
-func emailsToStrings(addrs []*mail.Address) []string {
+func emailsToStrings(addrs []mail.Address) []string {
 	if len(addrs) == 0 {
 		return nil
 	}
@@ -445,7 +445,7 @@ func (m *ClientMetadata) Valid() error {
 	}
 
 	uriLists := []struct {
-		vals []*url.URL
+		vals []url.URL
 		name string
 	}{
 		{m.RedirectURIs, "redirect_uris"},
@@ -453,10 +453,7 @@ func (m *ClientMetadata) Valid() error {
 	}
 	for _, list := range uriLists {
 		for _, uri := range list.vals {
-			if uri == nil {
-				return fmt.Errorf("invalid uri in list %s", list.name)
-			}
-			if err := validURI(uri, list.name); err != nil {
+			if err := validURI(&uri, list.name); err != nil {
 				return err
 			}
 		}
