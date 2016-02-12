@@ -546,6 +546,15 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 			},
 			ok: true,
 		},
+		// issuer URL has a tailing slash.
+		{
+			dsc: "https://foo.com/",
+			age: -1,
+			cfg: ProviderConfig{
+				Issuer: &url.URL{Scheme: "https", Host: "foo.com", Path: "/"},
+			},
+			ok: true,
+		},
 	}
 
 	for i, tt := range tests {

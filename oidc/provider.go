@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
 	"time"
 
@@ -618,7 +619,7 @@ func NewHTTPProviderConfigGetter(hc phttp.Client, issuerURL string) *httpProvide
 }
 
 func (r *httpProviderConfigGetter) Get() (cfg ProviderConfig, err error) {
-	req, err := http.NewRequest("GET", r.issuerURL+discoveryConfigPath, nil)
+	req, err := http.NewRequest("GET", path.Join(r.issuerURL, discoveryConfigPath), nil)
 	if err != nil {
 		return
 	}
