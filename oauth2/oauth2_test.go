@@ -158,8 +158,18 @@ func TestParseAuthCodeRequest(t *testing.T) {
 	}
 }
 
+type fakeBadClient struct {
+	Request *http.Request
+	err     error
+}
+
+func (f *fakeBadClient) Do(r *http.Request) (*http.Response, error) {
+	f.Request = r
+	return nil, f.err
+}
+
 func TestClientCredsToken(t *testing.T) {
-	hc := &phttp.RequestRecorder{Error: errors.New("error")}
+	hc := &fakeBadClient{nil, errors.New("error")}
 	cfg := Config{
 		Credentials: ClientCredentials{ID: "c#id", Secret: "c secret"},
 		Scope:       []string{"foo-scope", "bar-scope"},
@@ -238,7 +248,6 @@ func TestNewAuthenticatedRequest(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		hc := &phttp.HandlerClient{}
 		cfg := Config{
 			Credentials: ClientCredentials{ID: "c#id", Secret: "c secret"},
 			Scope:       []string{"foo-scope", "bar-scope"},
@@ -247,7 +256,7 @@ func TestNewAuthenticatedRequest(t *testing.T) {
 			RedirectURL: "http://example.com/redirect",
 			AuthMethod:  tt.authMethod,
 		}
-		c, err := NewClient(hc, cfg)
+		c, err := NewClient(nil, cfg)
 		req, err := c.newAuthenticatedRequest(tt.url, tt.values)
 		if err != nil {
 			t.Errorf("case %d: unexpected error: %v", i, err)
