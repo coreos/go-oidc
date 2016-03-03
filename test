@@ -14,9 +14,7 @@ COVER=${COVER:-"-cover"}
 
 RACE=${RACE:-"-race"}
 
-source ./build
-
-TESTABLE="http jose key oauth2 oidc"
+TESTABLE="http jose key oauth2 oidc ."
 FORMATTABLE="$TESTABLE"
 
 # user has not provided PKG override
