@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/square/go-jose"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
@@ -18,9 +17,9 @@ const ScopeOpenID = "openid"
 
 // TokenVerifier uses public keys to verify a JWT.
 type TokenVerifier interface {
-	// Verify verifies at least one of the signatures of the JWS and returns the
+	// Verify verifies at least one of the signatures of the JWT and returns the
 	// payload associated with JSON Web Token.
-	Verify(jws *jose.JsonWebSignature) (payload []byte, err error)
+	Verify(jwt string) (payload []byte, err error)
 }
 
 type IDToken struct {
@@ -44,15 +43,12 @@ func ParseIDToken(v TokenVerifier, t *oauth2.Token) (*IDToken, error) {
 	if val == nil {
 		return nil, errors.New("oidc: no id_token field in token")
 	}
-	s, ok := val.(string)
+	jwt, ok := val.(string)
 	if !ok {
 		return nil, errors.New("oidc: id_token field not a string")
 	}
-	jws, err := jose.ParseSigned(s)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: failed to parse id_token: %v", err)
-	}
-	payload, err := v.Verify(jws)
+
+	payload, err := v.Verify(jwt)
 	if err != nil {
 		return nil, err
 	}
