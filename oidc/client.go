@@ -556,12 +556,13 @@ func (c *ClientRegistrationResponse) UnmarshalJSON(data []byte) error {
 }
 
 type ClientConfig struct {
-	HTTPClient     phttp.Client
-	Credentials    ClientCredentials
-	Scope          []string
-	RedirectURL    string
-	ProviderConfig ProviderConfig
-	KeySet         key.PublicKeySet
+	HTTPClient           phttp.Client
+	Credentials          ClientCredentials
+	Scope                []string
+	RedirectURL          string
+	ProviderConfig       ProviderConfig
+	KeySet               key.PublicKeySet
+	DefaultKeyExpiration time.Duration
 }
 
 func NewClient(cfg ClientConfig) (*Client, error) {
@@ -573,12 +574,13 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 	}
 
 	c := Client{
-		credentials:    cfg.Credentials,
-		httpClient:     cfg.HTTPClient,
-		scope:          cfg.Scope,
-		redirectURL:    ru.String(),
-		providerConfig: newProviderConfigRepo(cfg.ProviderConfig),
-		keySet:         cfg.KeySet,
+		credentials:         cfg.Credentials,
+		httpClient:          cfg.HTTPClient,
+		scope:               cfg.Scope,
+		redirectURL:         ru.String(),
+		providerConfig:      newProviderConfigRepo(cfg.ProviderConfig),
+		keySet:              cfg.KeySet,
+		keySetDefaultExpire: cfg.DefaultKeyExpiration,
 	}
 
 	if c.httpClient == nil {
@@ -602,8 +604,9 @@ type Client struct {
 	keySet         key.PublicKeySet
 	providerSyncer *ProviderConfigSyncer
 
-	keySetSyncMutex sync.RWMutex
-	lastKeySetSync  time.Time
+	keySetSyncMutex     sync.RWMutex
+	lastKeySetSync      time.Time
+	keySetDefaultExpire time.Duration
 }
 
 func (c *Client) Healthy() error {
@@ -685,7 +688,7 @@ func (c *Client) maybeSyncKeys() error {
 	}
 
 	cfg := c.providerConfig.Get()
-	r := NewRemotePublicKeyRepo(c.httpClient, cfg.KeysEndpoint.String())
+	r := NewRemotePublicKeyRepo(c.httpClient, cfg.KeysEndpoint.String(), c.keySetDefaultExpire)
 	w := &clientKeyRepo{client: c}
 	_, err := key.Sync(r, w)
 	c.lastKeySetSync = time.Now().UTC()
