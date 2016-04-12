@@ -140,6 +140,11 @@ func NewClient(hc phttp.Client, cfg Config) (c *Client, err error) {
 	return
 }
 
+// Return the embedded HTTP client
+func (c *Client) HttpClient() phttp.Client {
+	return c.hc
+}
+
 // Generate the url for initial redirect to oauth provider.
 func (c *Client) AuthCodeURL(state, accessType, prompt string) string {
 	v := c.commonURLValues()
