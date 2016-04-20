@@ -220,12 +220,72 @@ func TestClientCredsToken(t *testing.T) {
 
 	gt := hc.Request.PostForm.Get("grant_type")
 	if gt != GrantTypeClientCreds {
-		t.Errorf("wrong grant_type, want=client_credentials, got=%v", gt)
+		t.Errorf("wrong grant_type, want=%v, got=%v", GrantTypeClientCreds, gt)
 	}
 
 	sc := strings.Split(hc.Request.PostForm.Get("scope"), " ")
 	if !reflect.DeepEqual(scope, sc) {
 		t.Errorf("wrong scope, want=%v, got=%v", scope, sc)
+	}
+}
+
+func TestUserCredsToken(t *testing.T) {
+	hc := &fakeBadClient{nil, errors.New("error")}
+	cfg := Config{
+		Credentials: ClientCredentials{ID: "c#id", Secret: "c secret"},
+		Scope:       []string{"foo-scope", "bar-scope"},
+		TokenURL:    "http://example.com/token",
+		AuthMethod:  AuthMethodClientSecretBasic,
+		RedirectURL: "http://example.com/redirect",
+		AuthURL:     "http://example.com/auth",
+	}
+
+	c, err := NewClient(hc, cfg)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	c.UserCredsToken("username", "password")
+	if hc.Request == nil {
+		t.Error("request is empty")
+	}
+
+	tu := hc.Request.URL.String()
+	if cfg.TokenURL != tu {
+		t.Errorf("wrong token url, want=%v, got=%v", cfg.TokenURL, tu)
+	}
+
+	ct := hc.Request.Header.Get("Content-Type")
+	if ct != "application/x-www-form-urlencoded" {
+		t.Errorf("wrong content-type, want=application/x-www-form-urlencoded, got=%v", ct)
+	}
+
+	cid, secret, ok := phttp.BasicAuth(hc.Request)
+	if !ok {
+		t.Error("unexpected error parsing basic auth")
+	}
+
+	if url.QueryEscape(cfg.Credentials.ID) != cid {
+		t.Errorf("wrong client ID, want=%v, got=%v", cfg.Credentials.ID, cid)
+	}
+
+	if url.QueryEscape(cfg.Credentials.Secret) != secret {
+		t.Errorf("wrong client secret, want=%v, got=%v", cfg.Credentials.Secret, secret)
+	}
+
+	err = hc.Request.ParseForm()
+	if err != nil {
+		t.Error("unexpected error parsing form")
+	}
+
+	gt := hc.Request.PostForm.Get("grant_type")
+	if gt != GrantTypeUserCreds {
+		t.Errorf("wrong grant_type, want=%v, got=%v", GrantTypeUserCreds, gt)
+	}
+
+	sc := strings.Split(hc.Request.PostForm.Get("scope"), " ")
+	if !reflect.DeepEqual(c.scope, sc) {
+		t.Errorf("wrong scope, want=%v, got=%v", c.scope, sc)
 	}
 }
 
