@@ -56,6 +56,7 @@ const (
 const (
 	GrantTypeAuthCode     = "authorization_code"
 	GrantTypeClientCreds  = "client_credentials"
+	GrantTypeUserCreds    = "password"
 	GrantTypeImplicit     = "implicit"
 	GrantTypeRefreshToken = "refresh_token"
 
@@ -209,6 +210,30 @@ func (c *Client) ClientCredsToken(scope []string) (result TokenResponse, err err
 	v := url.Values{
 		"scope":      {strings.Join(scope, " ")},
 		"grant_type": {GrantTypeClientCreds},
+	}
+
+	req, err := c.newAuthenticatedRequest(c.tokenURL.String(), v)
+	if err != nil {
+		return
+	}
+
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	return parseTokenResponse(resp)
+}
+
+// UserCredsToken posts the username and password to obtain a token scoped to the OAuth2 client via the "password" grant_type
+// May not be supported by all OAuth2 servers.
+func (c *Client) UserCredsToken(username, password string) (result TokenResponse, err error) {
+	v := url.Values{
+		"scope":      {strings.Join(c.scope, " ")},
+		"grant_type": {GrantTypeUserCreds},
+		"username":   {username},
+		"password":   {password},
 	}
 
 	req, err := c.newAuthenticatedRequest(c.tokenURL.String(), v)
