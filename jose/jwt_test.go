@@ -22,7 +22,7 @@ func TestParseJWT(t *testing.T) {
 			Claims{
 				"iss": "joe",
 				// NOTE: test numbers must be floats for equality checks to work since values are converted form interface{} to float64 by default.
-				"exp": 1300819380.0,
+				"exp": int64(1300819380),
 				"http://example.com/is_root": true,
 			},
 		},

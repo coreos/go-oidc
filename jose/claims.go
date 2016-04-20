@@ -105,6 +105,25 @@ func decodeClaims(payload []byte) (Claims, error) {
 	if err := json.Unmarshal(payload, &c); err != nil {
 		return nil, fmt.Errorf("malformed JWT claims, unable to decode: %v", err)
 	}
+
+	// Since we encode these claims as int64, it's advantageous for comparision to
+	// decode them as the same type.
+	//
+	// See https://github.com/coreos/dex/issues/418
+	var stdClaims struct {
+		IssuedAt int64 `json:"iat"`
+		Expires  int64 `json:"exp"`
+	}
+
+	// No error case. If decoding fails continue.
+	if err := json.Unmarshal(payload, &stdClaims); err == nil {
+		if stdClaims.IssuedAt != 0 {
+			c["iat"] = stdClaims.IssuedAt
+		}
+		if stdClaims.Expires != 0 {
+			c["exp"] = stdClaims.Expires
+		}
+	}
 	return c, nil
 }
 
