@@ -48,7 +48,7 @@ if [ -n "${fmtRes}" ]; then
 	exit 255
 fi
 
-if [[ -z "$TRAVIS_GO_VERSION" || "$TRAVIS_GO_VERSION" -ne "1.4" ]]; then
+if [[ -z "$TRAVIS_GO_VERSION" || "$TRAVIS_GO_VERSION" != "1.4.3" ]]; then
   echo "Checking govet..."
   vetRes=$(go vet $TEST)
   if [ -n "${vetRes}" ]; then
