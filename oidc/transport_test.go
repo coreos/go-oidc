@@ -74,8 +74,8 @@ func TestAuthenticatedTransportVerifiedJWT(t *testing.T) {
 	for i, tt := range tests {
 		at := &AuthenticatedTransport{
 			TokenRefresher: tt.refresher,
-			jwt:            tt.startJWT,
 		}
+		at.SetJWT(tt.startJWT)
 
 		gotJWT, err := at.verifiedJWT()
 		if !reflect.DeepEqual(tt.wantError, err) {
