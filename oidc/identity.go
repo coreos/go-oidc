@@ -8,10 +8,11 @@ import (
 )
 
 type Identity struct {
-	ID        string
-	Name      string
-	Email     string
-	ExpiresAt time.Time
+	ID              string
+	Name            string
+	Email           string
+	ExpiresAt       time.Time
+	AdditonalClaims jose.Claims
 }
 
 func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
@@ -41,4 +42,16 @@ func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
 	}
 
 	return &ident, nil
+}
+
+// CopyAdditonalClaims copies all additional claims to claims
+func (ident *Identity) CopyAdditonalClaims(claims jose.Claims) {
+	if ident.AdditonalClaims == nil {
+		return
+	}
+
+	for k, v := range ident.AdditonalClaims {
+		// TODO: ignore standard claims; related to issue #14
+		claims.Add(k, v)
+	}
 }

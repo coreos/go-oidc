@@ -111,3 +111,62 @@ func TestIdentityFromClaimsFail(t *testing.T) {
 		}
 	}
 }
+
+func TestCopyAdditonalClaims(t *testing.T) {
+	tests := []struct {
+		ident  Identity
+		claims jose.Claims
+		want   jose.Claims
+	}{
+		{
+			ident: Identity{},
+			claims: jose.Claims{
+				"sub":  "123850281",
+				"name": "Elroy",
+			},
+			want: jose.Claims{
+				"sub":  "123850281",
+				"name": "Elroy",
+			},
+		},
+		{
+			ident: Identity{
+				AdditonalClaims: jose.Claims{
+					"roles": "ROLE_ADMIN",
+				},
+			},
+			claims: jose.Claims{
+				"sub":  "123850281",
+				"name": "Elroy",
+			},
+			want: jose.Claims{
+				"sub":   "123850281",
+				"name":  "Elroy",
+				"roles": "ROLE_ADMIN",
+			},
+		},
+		{
+			ident: Identity{
+				AdditonalClaims: jose.Claims{
+					"roles": []string{"ROLE_ADMIN", "ROLE_BETA"},
+				},
+			},
+			claims: jose.Claims{
+				"sub":  "123850281",
+				"name": "Elroy",
+			},
+			want: jose.Claims{
+				"sub":   "123850281",
+				"name":  "Elroy",
+				"roles": []string{"ROLE_ADMIN", "ROLE_BETA"},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		tt.ident.CopyAdditonalClaims(tt.claims)
+		if !reflect.DeepEqual(tt.want, tt.claims) {
+			t.Errorf("case %d: want=%#v got=%#v", i, tt.want, tt.claims)
+		}
+	}
+}
