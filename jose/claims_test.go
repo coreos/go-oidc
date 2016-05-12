@@ -326,3 +326,30 @@ func TestStringArray(t *testing.T) {
 		}
 	}
 }
+
+func TestIsAdditionalClaim(t *testing.T) {
+	tests := []struct {
+		name string
+		val  bool
+	}{
+		{
+			name: ClaimSubject,
+			val:  false,
+		},
+		{
+			name: ClaimAddress,
+			val:  false,
+		},
+		{
+			name: "role",
+			val:  true,
+		},
+	}
+
+	for i, tt := range tests {
+		val := IsAdditonalClaim(tt.name)
+		if val != tt.val {
+			t.Errorf("case %d want val=%v, got val=%v", i, tt.val, val)
+		}
+	}
+}

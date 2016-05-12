@@ -7,6 +7,79 @@ import (
 	"time"
 )
 
+const (
+	// Standard, ID Token, and Registered Claim names
+	// See:
+	//  https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
+	//  https://tools.ietf.org/html/rfc7519#section-4.1
+	//  https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+	ClaimIssuer                              = "iss"
+	ClaimSubject                             = "sub"
+	ClaimAudience                            = "aud"
+	ClaimExpiration                          = "exp"
+	ClaimNotBefore                           = "nbf"
+	ClaimIssuedAt                            = "iat"
+	ClaimJWTID                               = "jti"
+	ClaimAuthenticationTime                  = "auth_time"
+	ClaimNonce                               = "nonce"
+	ClaimAuthenticationContextClassReference = "acr"
+	ClaimAuthenticationMethodsReferences     = "amr"
+	ClaimAuthorizedParty                     = "azp"
+	ClaimName                                = "name"
+	ClaimGivenName                           = "given_name"
+	ClaimFamilyName                          = "family_name"
+	ClaimMiddleName                          = "middle_name"
+	ClaimNickname                            = "nickname"
+	ClaimPreferredUsername                   = "preferred_username"
+	ClaimProfile                             = "profile"
+	ClaimPicture                             = "picture"
+	ClaimWebsite                             = "website"
+	ClaimEmail                               = "email"
+	ClaimEmailVerified                       = "email_verified"
+	ClaimGender                              = "gender"
+	ClaimBirthdate                           = "birthdate"
+	ClaimZoneinfo                            = "zoneinfo"
+	ClaimLocale                              = "locale"
+	ClaimPhoneNumber                         = "phone_number"
+	ClaimPhoneNumberVerified                 = "phone_number_verified"
+	ClaimAddress                             = "address"
+	ClaimUpdatedAt                           = "updated_at"
+)
+
+var standardClaims map[string]bool = map[string]bool{
+	ClaimIssuer:             true,
+	ClaimSubject:            true,
+	ClaimAudience:           true,
+	ClaimExpiration:         true,
+	ClaimNotBefore:          true,
+	ClaimIssuedAt:           true,
+	ClaimJWTID:              true,
+	ClaimAuthenticationTime: true,
+	ClaimNonce:              true,
+	ClaimAuthenticationContextClassReference: true,
+	ClaimAuthenticationMethodsReferences:     true,
+	ClaimAuthorizedParty:                     true,
+	ClaimName:                                true,
+	ClaimGivenName:                           true,
+	ClaimFamilyName:                          true,
+	ClaimMiddleName:                          true,
+	ClaimNickname:                            true,
+	ClaimPreferredUsername:                   true,
+	ClaimProfile:                             true,
+	ClaimPicture:                             true,
+	ClaimWebsite:                             true,
+	ClaimEmail:                               true,
+	ClaimEmailVerified:                       true,
+	ClaimGender:                              true,
+	ClaimBirthdate:                           true,
+	ClaimZoneinfo:                            true,
+	ClaimLocale:                              true,
+	ClaimPhoneNumber:                         true,
+	ClaimPhoneNumberVerified:                 true,
+	ClaimAddress:                             true,
+	ClaimUpdatedAt:                           true,
+}
+
 type Claims map[string]interface{}
 
 func (c Claims) Add(name string, value interface{}) {
@@ -123,4 +196,17 @@ func encodeClaims(c Claims) (string, error) {
 	}
 
 	return encodeSegment(b), nil
+}
+
+// IsStandardClaim reports whether name is a Standard, ID Token, or Registered Claim.
+func IsStandardClaim(name string) bool {
+	if _, ok := standardClaims[name]; ok {
+		return true
+	}
+	return false
+}
+
+// IsAdditonalClaim reports whether name is not a Standard, ID Token, or Registered Claim.
+func IsAdditonalClaim(name string) bool {
+	return !IsStandardClaim(name)
 }

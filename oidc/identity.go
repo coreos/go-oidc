@@ -41,17 +41,26 @@ func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
 		ident.ExpiresAt = exp
 	}
 
+	additonalClaims := jose.Claims{}
+	for k, v := range claims {
+		if jose.IsAdditonalClaim(k) {
+			additonalClaims.Add(k, v)
+		}
+	}
+
+	// Don't retain a reference if no Additional Claims are present.
+	if len(additonalClaims) > 0 {
+		ident.AdditonalClaims = additonalClaims
+	}
+
 	return &ident, nil
 }
 
 // CopyAdditonalClaims copies all additional claims to claims
 func (ident *Identity) CopyAdditonalClaims(claims jose.Claims) {
-	if ident.AdditonalClaims == nil {
-		return
-	}
-
 	for k, v := range ident.AdditonalClaims {
-		// TODO: ignore standard claims; related to issue #14
-		claims.Add(k, v)
+		if jose.IsAdditonalClaim(k) {
+			claims.Add(k, v)
+		}
 	}
 }
