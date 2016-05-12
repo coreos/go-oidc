@@ -7,6 +7,53 @@ import (
 	"time"
 )
 
+// Standard Claims from https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
+const (
+	ClaimSubject             = "sub"
+	ClaimName                = "name"
+	ClaimGivenName           = "given_name"
+	ClaimFamilyName          = "family_name"
+	ClaimMiddleName          = "middle_name"
+	ClaimNickname            = "nickname"
+	ClaimPreferredUsername   = "preferred_username"
+	ClaimProfile             = "profile"
+	ClaimPicture             = "picture"
+	ClaimWebsite             = "website"
+	ClaimEmail               = "email"
+	ClaimEmailVerified       = "email_verified"
+	ClaimGender              = "gender"
+	ClaimBirthdate           = "birthdate"
+	ClaimZoneinfo            = "zoneinfo"
+	ClaimLocale              = "locale"
+	ClaimPhoneNumber         = "phone_number"
+	ClaimPhoneNumberVerified = "phone_number_verified"
+	ClaimAddress             = "address"
+	ClaimUpdatedAt           = "updated_at"
+)
+
+var standardClaims map[string]bool = map[string]bool{
+	ClaimSubject:             true,
+	ClaimName:                true,
+	ClaimGivenName:           true,
+	ClaimFamilyName:          true,
+	ClaimMiddleName:          true,
+	ClaimNickname:            true,
+	ClaimPreferredUsername:   true,
+	ClaimProfile:             true,
+	ClaimPicture:             true,
+	ClaimWebsite:             true,
+	ClaimEmail:               true,
+	ClaimEmailVerified:       true,
+	ClaimGender:              true,
+	ClaimBirthdate:           true,
+	ClaimZoneinfo:            true,
+	ClaimLocale:              true,
+	ClaimPhoneNumber:         true,
+	ClaimPhoneNumberVerified: true,
+	ClaimAddress:             true,
+	ClaimUpdatedAt:           true,
+}
+
 type Claims map[string]interface{}
 
 func (c Claims) Add(name string, value interface{}) {
@@ -123,4 +170,15 @@ func encodeClaims(c Claims) (string, error) {
 	}
 
 	return encodeSegment(b), nil
+}
+
+func IsStandardClaim(name string) bool {
+	if _, ok := standardClaims[name]; ok {
+		return true
+	}
+	return false
+}
+
+func IsAdditonalClaim(name string) bool {
+	return !IsStandardClaim(name)
 }
