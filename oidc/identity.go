@@ -8,11 +8,11 @@ import (
 )
 
 type Identity struct {
-	ID              string
-	Name            string
-	Email           string
-	ExpiresAt       time.Time
-	AdditonalClaims jose.Claims
+	ID          string
+	Name        string
+	Email       string
+	ExpiresAt   time.Time
+	ExtraClaims jose.Claims
 }
 
 func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
@@ -41,26 +41,19 @@ func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
 		ident.ExpiresAt = exp
 	}
 
-	additonalClaims := jose.Claims{}
+	extraClaims := jose.Claims{}
 	for k, v := range claims {
-		if jose.IsAdditonalClaim(k) {
-			additonalClaims.Add(k, v)
+		switch k {
+		case "sub", "email", "exp", "name":
+		default:
+			extraClaims.Add(k, v)
 		}
 	}
 
-	// Don't retain a reference if no Additional Claims are present.
-	if len(additonalClaims) > 0 {
-		ident.AdditonalClaims = additonalClaims
+	// Don't retain a reference if no Extra Claims are present.
+	if len(extraClaims) > 0 {
+		ident.ExtraClaims = extraClaims
 	}
 
 	return &ident, nil
-}
-
-// CopyAdditonalClaims copies all additional claims to claims
-func (ident *Identity) CopyAdditonalClaims(claims jose.Claims) {
-	for k, v := range ident.AdditonalClaims {
-		if jose.IsAdditonalClaim(k) {
-			claims.Add(k, v)
-		}
-	}
 }
