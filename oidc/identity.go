@@ -7,11 +7,36 @@ import (
 	"github.com/coreos/go-oidc/jose"
 )
 
-type Identity struct {
-	ID        string
-	Name      string
-	Email     string
-	ExpiresAt time.Time
+type Address struct { // 5.1.1 Address Claim
+	Formatted     string // formatted
+	StreetAddress string // street_address
+	Locality      string // locality
+	Region        string // region
+	PostalCode    string // postal_code
+	Country       string // country
+}
+
+type Identity struct { // 5.1. Standard Claims
+	ID                  string // sub
+	Name                string // name
+	GivenName           string // given_name
+	FamilyName          string // family_name
+	MiddleName          string // middle_name
+	Nickname            string // nickname
+	PreferredUsername   string // preferred_username
+	Profile             string // profile
+	Website             string // website
+	Email               string // email
+	EmailVerified       bool   // email_verified
+	Gender              string // gender
+	Birthdate           string // birthdate
+	Zoneinfo            string // zoneinfo
+	Locale              string // locale
+	PhoneNumber         string // phone_number
+	PhoneNumberVerified bool   // phone_number_verified
+	Address             Address
+	AdditionalClaims    map[string]string
+	ExpiresAt           time.Time
 }
 
 func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
