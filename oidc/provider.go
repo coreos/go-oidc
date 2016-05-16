@@ -537,7 +537,7 @@ func (s *ProviderConfigSyncer) sync() (time.Duration, error) {
 		s.initialSyncDone = true
 	}
 
-	log.Infof("Updating provider config: config=%#v", cfg)
+	log.Debugf("Updating provider config: config=%#v", cfg)
 
 	return nextSyncAfter(cfg.ExpiresAt, s.clock), nil
 }
