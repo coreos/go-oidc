@@ -71,6 +71,7 @@ func TestProviderConfigUnmarshal(t *testing.T) {
 				"userinfo_endpoint": "https://server.example.com/connect/userinfo",
 				"jwks_uri": "https://server.example.com/jwks.json",
 				"registration_endpoint": "https://server.example.com/connect/register",
+				"revocation_endpoint": "https://server.example.com/connect/revoke",
 				"scopes_supported": [
 					"openid", "profile", "email", "address", "phone", "offline_access"
 				],
@@ -114,6 +115,7 @@ func TestProviderConfigUnmarshal(t *testing.T) {
 				UserInfoEndpoint:     uri("/connect/userinfo"),
 				KeysEndpoint:         uri("/jwks.json"),
 				RegistrationEndpoint: uri("/connect/register"),
+				RevocationEndpoint:   uri("/connect/revoke"),
 				ScopesSupported: []string{
 					"openid", "profile", "email", "address", "phone", "offline_access",
 				},
@@ -278,6 +280,9 @@ func TestProviderConfigMarshal(t *testing.T) {
 				RegistrationEndpoint: &url.URL{
 					Scheme: "https", Host: "auth.example.com", Path: "/register",
 				},
+				RevocationEndpoint: &url.URL{
+					Scheme: "https", Host: "auth.example.com", Path: "/revoke",
+				},
 				ScopesSupported:         DefaultScope,
 				ResponseTypesSupported:  []string{oauth2.ResponseTypeCode},
 				ResponseModesSupported:  DefaultResponseModesSupported,
@@ -294,6 +299,7 @@ func TestProviderConfigMarshal(t *testing.T) {
 	"userinfo_endpoint": "https://auth.example.com/userinfo",
 	"jwks_uri": "https://auth.example.com/jwk",
 	"registration_endpoint": "https://auth.example.com/register",
+	"revocation_endpoint": "https://auth.example.com/revoke",
 	"scopes_supported": [
 		"openid",
 		"email",
