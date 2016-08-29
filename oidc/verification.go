@@ -38,7 +38,11 @@ func containsString(needle string, haystack []string) bool {
 
 // Verify claims in accordance with OIDC spec
 // http://openid.net/specs/openid-connect-basic-1_0.html#IDTokenValidation
-func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
+func VerifyClaims(jwt jose.JWT, issuer, cliendID string) error {
+	return verifyClaims(jwt, issuer, cliendID, true)
+}
+
+func verifyClaims(jwt jose.JWT, issuer, clientID string, verifyAud bool) error {
 	now := time.Now().UTC()
 
 	claims, err := jwt.Claims()
@@ -71,6 +75,10 @@ func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
 	// as measured in UTC until the date/time.
 	if _, exists := claims["iat"].(float64); !exists {
 		return errors.New("missing claim: 'iat'")
+	}
+
+	if !verifyAud {
+		return nil
 	}
 
 	// aud REQUIRED. Audience(s) that this ID Token is intended for.
@@ -142,29 +150,49 @@ func VerifyClientClaims(jwt jose.JWT, issuer string) (string, error) {
 	return sub, nil
 }
 
-type JWTVerifier struct {
-	issuer   string
-	clientID string
-	syncFunc func() error
-	keysFunc func() []key.PublicKey
-	clock    clockwork.Clock
+type JWTVerifier interface {
+	Verify(jose.JWT) error
 }
 
+type jwtVerifier struct {
+	issuer    string
+	clientID  string
+	syncFunc  func() error
+	keysFunc  func() []key.PublicKey
+	clock     clockwork.Clock
+	verifyAud bool
+}
+
+// NewJWTVerifier creates a verifier that validates an ID Token in accordance with
+// http://openid.net/specs/openid-connect-basic-1_0.html#IDTokenValidation
 func NewJWTVerifier(issuer, clientID string, syncFunc func() error, keysFunc func() []key.PublicKey) JWTVerifier {
-	return JWTVerifier{
-		issuer:   issuer,
-		clientID: clientID,
-		syncFunc: syncFunc,
-		keysFunc: keysFunc,
-		clock:    clockwork.NewRealClock(),
+	return &jwtVerifier{
+		issuer:    issuer,
+		clientID:  clientID,
+		syncFunc:  syncFunc,
+		keysFunc:  keysFunc,
+		clock:     clockwork.NewRealClock(),
+		verifyAud: true,
 	}
 }
 
-func (v *JWTVerifier) Verify(jwt jose.JWT) error {
+// NewJWTVerifierRelaxed creates a verifier that follows OpenID Connect ID Token validation
+// procedure except for not validating the 'aud' claim.
+func NewJWTVerifierRelaxed(issuer string, syncFunc func() error, keysFunc func() []key.PublicKey) JWTVerifier {
+	return &jwtVerifier{
+		issuer:    issuer,
+		syncFunc:  syncFunc,
+		keysFunc:  keysFunc,
+		clock:     clockwork.NewRealClock(),
+		verifyAud: false,
+	}
+}
+
+func (v *jwtVerifier) Verify(jwt jose.JWT) error {
 	// Verify claims before verifying the signature. This is an optimization to throw out
 	// tokens we know are invalid without undergoing an expensive signature check and
 	// possibly a re-sync event.
-	if err := VerifyClaims(jwt, v.issuer, v.clientID); err != nil {
+	if err := verifyClaims(jwt, v.issuer, v.clientID, v.verifyAud); err != nil {
 		return fmt.Errorf("oidc: JWT claims invalid: %v", err)
 	}
 
