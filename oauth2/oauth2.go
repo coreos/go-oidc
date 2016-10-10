@@ -148,8 +148,11 @@ func (c *Client) HttpClient() phttp.Client {
 
 // Generate the url for initial redirect to oauth provider.
 func (c *Client) AuthCodeURL(state, accessType, prompt string) string {
-	v := c.commonURLValues()
+	v := url.Values{}
+	v.Set("client_id", c.creds.ID)
+	v.Set("redirect_uri", c.redirectURL.String())
 	v.Set("state", state)
+	v.Set("scope", strings.Join(c.scope, " "))
 	if strings.ToLower(accessType) == "offline" {
 		v.Set("access_type", "offline")
 	}
@@ -167,14 +170,6 @@ func (c *Client) AuthCodeURL(state, accessType, prompt string) string {
 		u.RawQuery += "&" + q
 	}
 	return u.String()
-}
-
-func (c *Client) commonURLValues() url.Values {
-	return url.Values{
-		"redirect_uri": {c.redirectURL.String()},
-		"scope":        {strings.Join(c.scope, " ")},
-		"client_id":    {c.creds.ID},
-	}
 }
 
 func (c *Client) newAuthenticatedRequest(urlToken string, values url.Values) (*http.Request, error) {
@@ -254,13 +249,15 @@ func (c *Client) UserCredsToken(username, password string) (result TokenResponse
 // If 'grantType' == GrantTypeAuthCode, then 'value' should be the authorization code.
 // If 'grantType' == GrantTypeRefreshToken, then 'value' should be the refresh token.
 func (c *Client) RequestToken(grantType, value string) (result TokenResponse, err error) {
-	v := c.commonURLValues()
+	v := url.Values{}
 
+	v.Set("client_id", c.creds.ID)
 	v.Set("grant_type", grantType)
 	v.Set("client_secret", c.creds.Secret)
 	switch grantType {
 	case GrantTypeAuthCode:
 		v.Set("code", value)
+		v.Set("redirect_uri", c.redirectURL.String())
 	case GrantTypeRefreshToken:
 		v.Set("refresh_token", value)
 	default:
