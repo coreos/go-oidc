@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Filter out any files with a !golint build tag.
 LINTABLE=$( go list -tags=golint -f '
   {{- range $i, $file := .GoFiles -}}
