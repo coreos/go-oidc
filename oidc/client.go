@@ -763,7 +763,7 @@ func (c *Client) RefreshToken(refreshToken string) (jose.JWT, error) {
 		return jose.JWT{}, err
 	}
 
-	jwt, err := jose.ParseJWT(t.IDToken)
+	jwt, err := jose.ParseJWT(t.AccessToken)
 	if err != nil {
 		return jose.JWT{}, err
 	}
