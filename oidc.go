@@ -1,3 +1,4 @@
+// Package oidc implements OpenID Connect client logic for the golang.org/x/oauth2 package.
 package oidc
 
 import (
@@ -33,6 +34,13 @@ const (
 //
 // This method sets the same context key used by the golang.org/x/oauth2 package,
 // so the returned context works for that package too.
+//
+//    myClient := &http.Client{}
+//    ctx := oidc.ClientContext(parentContext, myClient)
+//
+//    // This will use the custom client
+//    provider, err := oidc.NewProvider(ctx, "https://accounts.example.com")
+//
 func ClientContext(ctx context.Context, client *http.Client) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
 }
@@ -70,7 +78,10 @@ type providerJSON struct {
 	UserInfoURL string `json:"userinfo_endpoint"`
 }
 
-// NewProvider uses the OpenID Connect disovery mechanism to construct a Provider.
+// NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
+//
+// The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
+// or "https://login.salesforce.com".
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	resp, err := clientFromContext(ctx).Get(wellKnown)
