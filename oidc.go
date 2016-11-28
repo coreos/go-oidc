@@ -161,7 +161,19 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	if p.userInfoURL == "" {
 		return nil, errors.New("oidc: user info endpoint is not supported by this provider")
 	}
-	resp, err := clientFromContext(ctx).Get(p.userInfoURL)
+
+	req, err := http.NewRequest("GET", p.userInfoURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("oidc: create GET request: %v", err)
+	}
+
+	token, err := tokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("oidc: get access token: %v", err)
+	}
+	token.SetAuthHeader(req)
+
+	resp, err := clientFromContext(ctx).Do(req)
 	if err != nil {
 		return nil, err
 	}
