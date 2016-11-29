@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 	"golang.org/x/oauth2"
 	jose "gopkg.in/square/go-jose.v2"
 )
@@ -84,7 +85,7 @@ type providerJSON struct {
 // or "https://login.salesforce.com".
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
-	resp, err := clientFromContext(ctx).Get(wellKnown)
+	resp, err := ctxhttp.Get(ctx, clientFromContext(ctx), wellKnown)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	}
 	token.SetAuthHeader(req)
 
-	resp, err := clientFromContext(ctx).Do(req)
+	resp, err := ctxhttp.Do(ctx, clientFromContext(ctx), req)
 	if err != nil {
 		return nil, err
 	}
