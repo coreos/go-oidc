@@ -16,6 +16,6 @@ GOOGLE_OAUTH2_CLIENT_SECRET
 Finally run the examples using the Go tool and navigate to http://127.0.0.1:5556.
 
 ```
-go run ./examples/idtoken/app.go
+go run ./example/idtoken/app.go
 ```
 [google-developer-console]: https://console.developers.google.com/apis/dashboard
