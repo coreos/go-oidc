@@ -27,6 +27,20 @@ func TestVerify(t *testing.T) {
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
 		},
 		{
+			name: "expired token",
+			idToken: idToken{
+				Issuer: "https://foo",
+				Expiry: jsonTime(time.Now().Add(-time.Hour)),
+			},
+			config: verificationConfig{
+				issuer:      "https://foo",
+				checkExpiry: time.Now,
+			},
+			signKey: testKeyRSA_2048_0_Priv,
+			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
+			wantErr: true,
+		},
+		{
 			name: "invalid signature",
 			idToken: idToken{
 				Issuer: "https://foo",
