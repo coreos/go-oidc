@@ -20,8 +20,10 @@ func TestVerify(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer: "https://foo",
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
+				SkipExpiryCheck:   true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
@@ -32,9 +34,9 @@ func TestVerify(t *testing.T) {
 				Issuer: "https://foo",
 				Expiry: jsonTime(time.Now().Add(-time.Hour)),
 			},
-			config: verificationConfig{
-				issuer:      "https://foo",
-				checkExpiry: time.Now,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
@@ -45,23 +47,13 @@ func TestVerify(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer: "https://foo",
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
+				SkipExpiryCheck:   true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_1},
-			wantErr: true,
-		},
-		{
-			name: "invalid issuer",
-			idToken: idToken{
-				Issuer: "https://foo",
-			},
-			config: verificationConfig{
-				issuer: "https://bar",
-			},
-			signKey: testKeyRSA_2048_0_Priv,
-			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
 			wantErr: true,
 		},
 	}
@@ -78,9 +70,10 @@ func TestVerifyAudience(t *testing.T) {
 				Issuer:   "https://foo",
 				Audience: []string{"client1"},
 			},
-			config: verificationConfig{
-				issuer:   "https://foo",
-				audience: "client1",
+			config: Config{
+				ClientID:        "client1",
+				SkipNonceCheck:  true,
+				SkipExpiryCheck: true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
@@ -91,9 +84,10 @@ func TestVerifyAudience(t *testing.T) {
 				Issuer:   "https://foo",
 				Audience: []string{"client2"},
 			},
-			config: verificationConfig{
-				issuer:   "https://foo",
-				audience: "client1",
+			config: Config{
+				ClientID:        "client1",
+				SkipNonceCheck:  true,
+				SkipExpiryCheck: true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
@@ -105,9 +99,10 @@ func TestVerifyAudience(t *testing.T) {
 				Issuer:   "https://foo",
 				Audience: []string{"client2", "client1"},
 			},
-			config: verificationConfig{
-				issuer:   "https://foo",
-				audience: "client1",
+			config: Config{
+				ClientID:        "client1",
+				SkipNonceCheck:  true,
+				SkipExpiryCheck: true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
@@ -125,8 +120,10 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer: "https://foo",
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
+				SkipExpiryCheck:   true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			signAlg: RS256, // By default we only support RS256.
@@ -137,8 +134,10 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer: "https://foo",
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
+				SkipExpiryCheck:   true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			signAlg: RS512,
@@ -150,9 +149,11 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer:       "https://foo",
-				requiredAlgs: []string{ES384},
+			config: Config{
+				SupportedSigningAlgs: []string{ES384},
+				SkipClientIDCheck:    true,
+				SkipNonceCheck:       true,
+				SkipExpiryCheck:      true,
 			},
 			signAlg: ES384,
 			signKey: testKeyECDSA_384_0_Priv,
@@ -163,9 +164,11 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer:       "https://foo",
-				requiredAlgs: []string{RS256, ES384},
+			config: Config{
+				SkipClientIDCheck:    true,
+				SkipNonceCheck:       true,
+				SkipExpiryCheck:      true,
+				SupportedSigningAlgs: []string{RS256, ES384},
 			},
 			signAlg: ES384,
 			signKey: testKeyECDSA_384_0_Priv,
@@ -176,9 +179,11 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: idToken{
 				Issuer: "https://foo",
 			},
-			config: verificationConfig{
-				issuer:       "https://foo",
-				requiredAlgs: []string{RS256, ES512},
+			config: Config{
+				SupportedSigningAlgs: []string{RS256, ES512},
+				SkipClientIDCheck:    true,
+				SkipNonceCheck:       true,
+				SkipExpiryCheck:      true,
 			},
 			signAlg: ES384,
 			signKey: testKeyECDSA_384_0_Priv,
@@ -201,7 +206,7 @@ type verificationTest struct {
 	// from the signingKey.
 	signAlg string
 
-	config  verificationConfig
+	config  Config
 	pubKeys []jose.JSONWebKey
 
 	wantErr bool
@@ -265,7 +270,7 @@ func (v verificationTest) run(t *testing.T) {
 	server := httptest.NewServer(newKeyServer(v.pubKeys...))
 	defer server.Close()
 
-	verifier := newVerifier(newRemoteKeySet(ctx, server.URL, now), &v.config)
+	verifier := newVerifier(newRemoteKeySet(ctx, server.URL, now), &v.config, "https://foo")
 
 	if _, err := verifier.Verify(ctx, token); err != nil {
 		if !v.wantErr {
