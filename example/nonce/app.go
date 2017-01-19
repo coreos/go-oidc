@@ -23,10 +23,7 @@ var (
 
 const appNonce = "a super secret nonce"
 
-// Create a nonce source.
-type nonceSource struct{}
-
-func (n nonceSource) ClaimNonce(nonce string) error {
+func ClaimNonce(nonce string) error {
 	if nonce != appNonce {
 		return errors.New("unregonized nonce")
 	}
@@ -41,8 +38,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	oidcConfig := &oidc.Config{
+		ClientID:   clientID,
+		ClaimNonce: ClaimNonce,
+	}
 	// Use the nonce source to create a custom ID Token verifier.
-	nonceEnabledVerifier := provider.Verifier(oidc.VerifyNonce(nonceSource{}))
+	nonceEnabledVerifier := provider.Verifier(oidcConfig)
 
 	config := oauth2.Config{
 		ClientID:     clientID,

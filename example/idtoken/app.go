@@ -27,7 +27,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	verifier := provider.Verifier()
+	oidcConfig := &oidc.Config{
+		ClientID:       clientID,
+		SkipNonceCheck: true,
+	}
+	verifier := provider.Verifier(oidcConfig)
 
 	config := oauth2.Config{
 		ClientID:     clientID,
