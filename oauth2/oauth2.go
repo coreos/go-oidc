@@ -141,6 +141,22 @@ func NewClient(hc phttp.Client, cfg Config) (c *Client, err error) {
 	return
 }
 
+// Return the redirection url
+func (c *Client) GetRedirectionURL() string {
+	return c.redirectURL.String()
+}
+
+// Set the redirection url
+func (c *Client) SetRedirectionURL(v string) error {
+	u, err := url.Parse(v)
+	if err != nil {
+		return err
+	}
+	c.redirectURL = u
+
+	return nil
+}
+
 // Return the embedded HTTP client
 func (c *Client) HttpClient() phttp.Client {
 	return c.hc
