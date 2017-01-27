@@ -29,6 +29,34 @@ func TestVerify(t *testing.T) {
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
 		},
 		{
+			name: "invalid issuer",
+			idToken: idToken{
+				Issuer: "foo",
+			},
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
+				SkipExpiryCheck:   true,
+			},
+			signKey: testKeyRSA_2048_0_Priv,
+			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
+			wantErr: true,
+		},
+		{
+			name: "issuer without schema",
+			idToken: idToken{
+				Issuer: "foo",
+			},
+			config: Config{
+				SkipClientIDCheck:     true,
+				SkipNonceCheck:        true,
+				SkipExpiryCheck:       true,
+				SkipIssuerSchemaCheck: true,
+			},
+			signKey: testKeyRSA_2048_0_Priv,
+			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
+		},
+		{
 			name: "expired token",
 			idToken: idToken{
 				Issuer: "https://foo",
@@ -279,6 +307,25 @@ func (v verificationTest) run(t *testing.T) {
 	} else {
 		if v.wantErr {
 			t.Errorf("%s: expected error", v.name)
+		}
+	}
+}
+
+func TestTrimURLSchema(t *testing.T) {
+	tests := []struct {
+		val  string
+		want string
+	}{
+		{"foo", "foo"},
+		{"bar://foo", "foo"},
+		{"bar://foo://", "foo://"},
+		{"bar://", ""},
+	}
+
+	for _, test := range tests {
+		got := trimURLSchema(test.val)
+		if got != test.want {
+			t.Errorf("trimURLSchema(%q) want=%q, got=%q", test.val, test.want, got)
 		}
 	}
 }

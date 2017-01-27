@@ -47,6 +47,12 @@ type Config struct {
 	// If true, nonce claim is not checked. Must be true if ClaimNonce field is empty.
 	SkipNonceCheck bool
 
+	// Google sometimes return "accounts.google.com" as the ID Token issuer, instead of
+	// the spec required value "https://accounts.google.com".
+	//
+	// Enable this option to tolerate when the issuer claim is schemaless.
+	SkipIssuerSchemaCheck bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 }
@@ -92,6 +98,14 @@ func contains(sli []string, ele string) bool {
 		}
 	}
 	return false
+}
+
+func trimURLSchema(url string) string {
+	const s = "://"
+	if i := strings.Index(url, s); i >= 0 {
+		return url[i+len(s):]
+	}
+	return url
 }
 
 // Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
@@ -141,7 +155,9 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	// Check issuer.
 	if t.Issuer != v.issuer {
-		return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+		if !v.config.SkipIssuerSchemaCheck || t.Issuer != trimURLSchema(v.issuer) {
+			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+		}
 	}
 
 	// If a client ID has been provided, make sure it's part of the audience. SkipClientIDCheck must be true if ClientID is empty.
