@@ -43,15 +43,15 @@ func TestVerify(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "issuer without schema",
+			name:   "google accounts without scheme",
+			issuer: "https://accounts.google.com",
 			idToken: idToken{
-				Issuer: "foo",
+				Issuer: "accounts.google.com",
 			},
 			config: Config{
-				SkipClientIDCheck:     true,
-				SkipNonceCheck:        true,
-				SkipExpiryCheck:       true,
-				SkipIssuerSchemaCheck: true,
+				SkipClientIDCheck: true,
+				SkipNonceCheck:    true,
+				SkipExpiryCheck:   true,
 			},
 			signKey: testKeyRSA_2048_0_Priv,
 			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0},
@@ -227,6 +227,9 @@ func TestVerifySigningAlg(t *testing.T) {
 type verificationTest struct {
 	name string
 
+	// if not provided defaults to "https://foo"
+	issuer string
+
 	// ID token claims and a signing key to create the JWT.
 	idToken idToken
 	signKey jose.JSONWebKey
@@ -298,7 +301,11 @@ func (v verificationTest) run(t *testing.T) {
 	server := httptest.NewServer(newKeyServer(v.pubKeys...))
 	defer server.Close()
 
-	verifier := newVerifier(newRemoteKeySet(ctx, server.URL, now), &v.config, "https://foo")
+	issuer := "https://foo"
+	if v.issuer != "" {
+		issuer = v.issuer
+	}
+	verifier := newVerifier(newRemoteKeySet(ctx, server.URL, now), &v.config, issuer)
 
 	if _, err := verifier.Verify(ctx, token); err != nil {
 		if !v.wantErr {
@@ -307,25 +314,6 @@ func (v verificationTest) run(t *testing.T) {
 	} else {
 		if v.wantErr {
 			t.Errorf("%s: expected error", v.name)
-		}
-	}
-}
-
-func TestTrimURLSchema(t *testing.T) {
-	tests := []struct {
-		val  string
-		want string
-	}{
-		{"foo", "foo"},
-		{"bar://foo", "foo"},
-		{"bar://foo://", "foo://"},
-		{"bar://", ""},
-	}
-
-	for _, test := range tests {
-		got := trimURLSchema(test.val)
-		if got != test.want {
-			t.Errorf("trimURLSchema(%q) want=%q, got=%q", test.val, test.want, got)
 		}
 	}
 }
