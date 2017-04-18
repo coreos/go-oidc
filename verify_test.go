@@ -218,6 +218,22 @@ func TestVerifySigningAlg(t *testing.T) {
 			pubKeys: []jose.JSONWebKey{testKeyECDSA_384_0},
 			wantErr: true,
 		},
+		{
+			name: "algs only",
+			idToken: idToken{
+				Issuer: "https://foo",
+			},
+			config: Config{
+				SupportedSigningAlgs: []string{RS256, ES512},
+				SkipClientIDCheck:    true,
+				SkipNonceCheck:       true,
+				SkipExpiryCheck:      true,
+			},
+			signAlg: RS256,
+			signKey: testKeyRSA_2048_0_Alg_Priv,
+			pubKeys: []jose.JSONWebKey{testKeyRSA_2048_0_Alg},
+			wantErr: false,
+		},
 	}
 	for _, test := range tests {
 		test.run(t)

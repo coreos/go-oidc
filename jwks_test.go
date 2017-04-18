@@ -33,6 +33,7 @@ func TestKeysFormID(t *testing.T) {
 		name     string
 		keys     []jose.JSONWebKey
 		keyIDs   []string
+		algs     []string
 		wantKeys []jose.JSONWebKey
 	}{
 		{
@@ -72,6 +73,19 @@ func TestKeysFormID(t *testing.T) {
 				testKeyRSA_2048_0.KeyID,
 			},
 		},
+		{
+			name: "algorithm matches",
+			keys: []jose.JSONWebKey{
+				testKeyRSA_2048_0,
+				testKeyECDSA_256_0,
+			},
+			algs: []string{
+				"RS256",
+			},
+			wantKeys: []jose.JSONWebKey{
+				testKeyRSA_2048_0,
+			},
+		},
 	}
 
 	t0 := time.Now()
@@ -86,10 +100,20 @@ func TestKeysFormID(t *testing.T) {
 			defer server.Close()
 
 			keySet := newRemoteKeySet(ctx, server.URL, now)
-			gotKeys, err := keySet.keysWithID(ctx, test.keyIDs)
-			if err != nil {
-				t.Errorf("%s: %v", test.name, err)
-				return
+			var gotKeys []jose.JSONWebKey
+			var err error
+			if len(test.keyIDs) == 0 {
+				gotKeys, err = keySet.keysWithAlgs(ctx, test.algs)
+				if err != nil {
+					t.Errorf("%s: %v", test.name, err)
+					return
+				}
+			} else {
+				gotKeys, err = keySet.keysWithID(ctx, test.keyIDs)
+				if err != nil {
+					t.Errorf("%s: %v", test.name, err)
+					return
+				}
 			}
 			if !reflect.DeepEqual(gotKeys, test.wantKeys) {
 				t.Errorf("%s: expected keys=%#v, got=%#v", test.name, test.wantKeys, gotKeys)

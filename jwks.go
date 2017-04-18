@@ -156,6 +156,89 @@ func (r *remoteKeySet) keysWithID(ctx context.Context, keyIDs []string) ([]jose.
 	return keys, nil
 }
 
+func (r *remoteKeySet) keysWithAlgsFromCache(algs []string) ([]jose.JSONWebKey, bool) {
+	r.mu.Lock()
+	keys, expiry := r.cachedKeys, r.expiry
+	r.mu.Unlock()
+
+	// Have the keys expired?
+	if expiry.Add(keysExpiryDelta).Before(r.now()) {
+		return nil, false
+	}
+
+	var signingKeys []jose.JSONWebKey
+	for _, key := range keys {
+		if contains(algs, key.Algorithm) {
+			signingKeys = append(signingKeys, key)
+		}
+	}
+
+	if len(signingKeys) == 0 {
+		// Are the keys about to expire?
+		if r.now().Add(keysExpiryDelta).After(expiry) {
+			return nil, false
+		}
+	}
+
+	return signingKeys, true
+}
+func (r *remoteKeySet) keysWithAlgs(ctx context.Context, algs []string) ([]jose.JSONWebKey, error) {
+	keys, ok := r.keysWithAlgsFromCache(algs)
+	if ok {
+		return keys, nil
+	}
+
+	var inflightCtx *inflight
+	func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		// If there's not a current inflight request, create one.
+		if r.inflightCtx == nil {
+			inflightCtx := &inflight{make(chan struct{}), nil}
+			r.inflightCtx = inflightCtx
+
+			go func() {
+				// TODO(ericchiang): Upstream Kubernetes request that we recover every time
+				// we spawn a goroutine, because panics in a goroutine will bring down the
+				// entire program. There's no way to recover from another goroutine's panic.
+				//
+				// Most users actually want to let the panic propagate and bring down the
+				// program because it implies some unrecoverable state.
+				//
+				// Add a context key to allow the recover behavior.
+				//
+				// See: https://github.com/coreos/go-oidc/issues/89
+
+				// Sync keys and close inflightCtx when that's done.
+				// Use the remoteKeySet's context instead of the requests context
+				// because a re-sync is unique to the keys set and will span multiple
+				// requests.
+				inflightCtx.Cancel(r.updateKeys(r.ctx))
+
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				r.inflightCtx = nil
+			}()
+		}
+
+		inflightCtx = r.inflightCtx
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-inflightCtx.Done():
+		if err := inflightCtx.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Since we've just updated keys, we don't care about the cache miss.
+	keys, _ = r.keysWithAlgsFromCache(algs)
+	return keys, nil
+}
+
 func (r *remoteKeySet) updateKeys(ctx context.Context) error {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {

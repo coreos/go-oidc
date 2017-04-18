@@ -185,22 +185,35 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	var keyIDs, gotAlgs []string
 	for _, sig := range jws.Signatures {
 		if len(v.config.SupportedSigningAlgs) == 0 || contains(v.config.SupportedSigningAlgs, sig.Header.Algorithm) {
-			keyIDs = append(keyIDs, sig.Header.KeyID)
-		} else {
 			gotAlgs = append(gotAlgs, sig.Header.Algorithm)
 		}
+		if strings.TrimSpace(sig.Header.KeyID) != "" {
+			keyIDs = append(keyIDs, sig.Header.KeyID)
+		}
 	}
-	if len(keyIDs) == 0 {
-		return nil, fmt.Errorf("oidc: no signatures use a supported algorithm, expected %q got %q", v.config.SupportedSigningAlgs, gotAlgs)
+	if len(gotAlgs) == 0 {
+		return nil, fmt.Errorf("oidc: no signatures use a supported algorithm, expected any of %q got %q", v.config.SupportedSigningAlgs, gotAlgs)
 	}
-
-	// Get keys from the remote key set. This may trigger a re-sync.
-	keys, err := v.keySet.keysWithID(ctx, keyIDs)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: get keys for id token: %v", err)
-	}
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("oidc: no keys match signature ID(s) %q", keyIDs)
+	var keys []jose.JSONWebKey
+	// key ids are present
+	if len(keyIDs) != 0 {
+		// Get keys from the remote key set. This may trigger a re-sync.
+		keys, err = v.keySet.keysWithID(ctx, keyIDs)
+		if err != nil {
+			return nil, fmt.Errorf("oidc: get keys for id token: %v", err)
+		}
+		if len(keys) == 0 {
+			return nil, fmt.Errorf("oidc: no keys match signature ID(s) %q", keyIDs)
+		}
+	} else {
+		// no key ids are present, try all keys with supported algorithm and signing type
+		keys, err = v.keySet.keysWithAlgs(ctx, gotAlgs)
+		if err != nil {
+			return nil, fmt.Errorf("oidc: get keys for id token from algorithm: %v", err)
+		}
+		if len(keys) == 0 {
+			return nil, fmt.Errorf("oidc: no keys match signature algorithms %q", gotAlgs)
+		}
 	}
 
 	// Try to use a key to validate the signature.
