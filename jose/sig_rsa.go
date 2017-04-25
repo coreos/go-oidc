@@ -19,7 +19,7 @@ type SignerRSA struct {
 }
 
 func NewVerifierRSA(jwk JWK) (*VerifierRSA, error) {
-	if jwk.Alg != "" && jwk.Alg != "RS256" {
+	if jwk.Alg != "" && jwk.Alg != "PS256" {
 		return nil, fmt.Errorf("unsupported key algorithm %q", jwk.Alg)
 	}
 
@@ -51,17 +51,17 @@ func (v *VerifierRSA) ID() string {
 }
 
 func (v *VerifierRSA) Alg() string {
-	return "RS256"
+	return "PS256"
 }
 
 func (v *VerifierRSA) Verify(sig []byte, data []byte) error {
 	h := v.Hash.New()
 	h.Write(data)
-	return rsa.VerifyPKCS1v15(&v.PublicKey, v.Hash, h.Sum(nil), sig)
+	return rsa.VerifyPSS(&v.PublicKey, v.Hash, h.Sum(nil), sig, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
 }
 
 func (s *SignerRSA) Sign(data []byte) ([]byte, error) {
 	h := s.Hash.New()
 	h.Write(data)
-	return rsa.SignPKCS1v15(rand.Reader, &s.PrivateKey, s.Hash, h.Sum(nil))
+	return rsa.SignPSS(rand.Reader, &s.PrivateKey, s.Hash, h.Sum(nil), &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
 }
