@@ -208,40 +208,57 @@ func TestJWTVerifier(t *testing.T) {
 	}{
 		{
 			name: "JWT signed with available key",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{pk1}
 				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "XXX", past12, future12, priv1.Signer()),
 			wantErr: false,
 		},
 		{
 			name: "JWT signed with available key, with bad claims",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{pk1}
 				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "YYY", past12, future12, priv1.Signer()),
 			wantErr: true,
 		},
-
 		{
-			name: "JWT signed with available key",
-			verifier: JWTVerifier{
+			name: "JWT signed with available key, bad 'aud' claim but not checked",
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{pk1}
 				},
+				verifyAud: false,
+			},
+			jwt:     newJWT(iss, "XXX", "YYY", past12, future12, priv1.Signer()),
+			wantErr: false,
+		},
+
+		{
+			name: "JWT signed with available key",
+			verifier: &jwtVerifier{
+				issuer:   "example.com",
+				clientID: "XXX",
+				syncFunc: func() error { return nil },
+				keysFunc: func() []key.PublicKey {
+					return []key.PublicKey{pk1}
+				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", []string{"YYY", "ZZZ"}, past12, future12, priv1.Signer()),
 			wantErr: true,
@@ -249,13 +266,14 @@ func TestJWTVerifier(t *testing.T) {
 
 		{
 			name: "expired JWT signed with available key",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{pk1}
 				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "XXX", past36, past12, priv1.Signer()),
 			wantErr: true,
@@ -263,7 +281,7 @@ func TestJWTVerifier(t *testing.T) {
 
 		{
 			name: "JWT signed with unrecognized key, verifiable after sync",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
@@ -277,6 +295,7 @@ func TestJWTVerifier(t *testing.T) {
 						}[i]
 					}
 				}(),
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "XXX", past36, future12, priv2.Signer()),
 			wantErr: false,
@@ -284,13 +303,14 @@ func TestJWTVerifier(t *testing.T) {
 
 		{
 			name: "JWT signed with unrecognized key, not verifiable after sync",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{pk1}
 				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "XXX", past12, future12, priv2.Signer()),
 			wantErr: true,
@@ -298,13 +318,14 @@ func TestJWTVerifier(t *testing.T) {
 
 		{
 			name: "verifier gets no keys from keysFunc, still not verifiable after sync",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{}
 				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "XXX", past12, future12, priv1.Signer()),
 			wantErr: true,
@@ -312,7 +333,7 @@ func TestJWTVerifier(t *testing.T) {
 
 		{
 			name: "verifier gets no keys from keysFunc, verifiable after sync",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
@@ -326,6 +347,7 @@ func TestJWTVerifier(t *testing.T) {
 						}[i]
 					}
 				}(),
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", "XXX", past12, future12, priv2.Signer()),
 			wantErr: false,
@@ -333,20 +355,21 @@ func TestJWTVerifier(t *testing.T) {
 
 		{
 			name: "JWT signed with available key, 'aud' is a string array",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error { return nil },
 				keysFunc: func() []key.PublicKey {
 					return []key.PublicKey{pk1}
 				},
+				verifyAud: true,
 			},
 			jwt:     newJWT(iss, "XXX", []string{"ZZZ", "XXX"}, past12, future12, priv1.Signer()),
 			wantErr: false,
 		},
 		{
 			name: "invalid issuer claim shouldn't trigger sync",
-			verifier: JWTVerifier{
+			verifier: &jwtVerifier{
 				issuer:   "example.com",
 				clientID: "XXX",
 				syncFunc: func() error {
@@ -363,6 +386,7 @@ func TestJWTVerifier(t *testing.T) {
 						}[i]
 					}
 				}(),
+				verifyAud: true,
 			},
 			jwt:     newJWT("invalid-issuer", "XXX", []string{"ZZZ", "XXX"}, past12, future12, priv2.Signer()),
 			wantErr: true,
