@@ -285,13 +285,6 @@ func (a *audience) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (a audience) MarshalJSON() ([]byte, error) {
-	if len(a) == 1 {
-		return json.Marshal(a[0])
-	}
-	return json.Marshal([]string(a))
-}
-
 type jsonTime time.Time
 
 func (j *jsonTime) UnmarshalJSON(b []byte) error {
@@ -312,8 +305,4 @@ func (j *jsonTime) UnmarshalJSON(b []byte) error {
 	}
 	*j = jsonTime(time.Unix(unix, 0))
 	return nil
-}
-
-func (j jsonTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Time(j).Unix())
 }
