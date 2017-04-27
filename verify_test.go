@@ -24,7 +24,6 @@ func TestVerify(t *testing.T) {
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
@@ -35,7 +34,6 @@ func TestVerify(t *testing.T) {
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
@@ -46,7 +44,6 @@ func TestVerify(t *testing.T) {
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 				SkipExpiryCheck:   true,
 			},
 			signKey:         newRSAKey(t),
@@ -59,7 +56,6 @@ func TestVerify(t *testing.T) {
 			idToken: `{"iss":"accounts.google.com"}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
@@ -69,7 +65,6 @@ func TestVerify(t *testing.T) {
 			idToken: `{"iss":"https://foo","exp":` + strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 			},
 			signKey: newRSAKey(t),
 			wantErr: true,
@@ -79,7 +74,6 @@ func TestVerify(t *testing.T) {
 			idToken: `{"iss":"https://foo","exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 			},
 			signKey: newRSAKey(t),
 		},
@@ -90,7 +84,6 @@ func TestVerify(t *testing.T) {
 				`}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 			},
 			signKey: newRSAKey(t),
 		},
@@ -107,7 +100,6 @@ func TestVerifyAudience(t *testing.T) {
 			idToken: `{"iss":"https://foo","aud":"client1"}`,
 			config: Config{
 				ClientID:        "client1",
-				SkipNonceCheck:  true,
 				SkipExpiryCheck: true,
 			},
 			signKey: newRSAKey(t),
@@ -117,7 +109,6 @@ func TestVerifyAudience(t *testing.T) {
 			idToken: `{"iss":"https://foo","aud":"client2"}`,
 			config: Config{
 				ClientID:        "client1",
-				SkipNonceCheck:  true,
 				SkipExpiryCheck: true,
 			},
 			signKey: newRSAKey(t),
@@ -128,7 +119,6 @@ func TestVerifyAudience(t *testing.T) {
 			idToken: `{"iss":"https://foo","aud":["client1","client2"]}`,
 			config: Config{
 				ClientID:        "client2",
-				SkipNonceCheck:  true,
 				SkipExpiryCheck: true,
 			},
 			signKey: newRSAKey(t),
@@ -146,7 +136,6 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
@@ -156,7 +145,6 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
 				SkipClientIDCheck: true,
-				SkipNonceCheck:    true,
 				SkipExpiryCheck:   true,
 			},
 			signKey: newECDSAKey(t),
@@ -168,7 +156,6 @@ func TestVerifySigningAlg(t *testing.T) {
 			config: Config{
 				SupportedSigningAlgs: []string{ES256},
 				SkipClientIDCheck:    true,
-				SkipNonceCheck:       true,
 				SkipExpiryCheck:      true,
 			},
 			signKey: newECDSAKey(t),
@@ -178,7 +165,6 @@ func TestVerifySigningAlg(t *testing.T) {
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
 				SkipClientIDCheck:    true,
-				SkipNonceCheck:       true,
 				SkipExpiryCheck:      true,
 				SupportedSigningAlgs: []string{RS256, ES256},
 			},
@@ -190,7 +176,6 @@ func TestVerifySigningAlg(t *testing.T) {
 			config: Config{
 				SupportedSigningAlgs: []string{RS256, ES512},
 				SkipClientIDCheck:    true,
-				SkipNonceCheck:       true,
 				SkipExpiryCheck:      true,
 			},
 			signKey: newECDSAKey(t),

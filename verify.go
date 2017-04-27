@@ -40,12 +40,6 @@ type Config struct {
 	//
 	// If not provided, users must explicitly set SkipClientIDCheck.
 	ClientID string
-	// Method to verify the ID Token nonce. If a nonce is present and this method
-	// is nil, users must explicitly set SkipNonceCheck.
-	//
-	// If the ID Token nonce is empty, for example if the client didn't provide a nonce in
-	// the initial redirect, this may be nil.
-	ClaimNonce func(nonce string) error
 	// If specified, only this set of algorithms may be used to sign the JWT.
 	//
 	// Since many providers only support RS256, SupportedSigningAlgs defaults to this value.
@@ -55,8 +49,6 @@ type Config struct {
 	SkipClientIDCheck bool
 	// If true, token expiry is not checked.
 	SkipExpiryCheck bool
-	// If true, nonce claim is not checked. Must be true if ClaimNonce field is empty.
-	SkipNonceCheck bool
 
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
@@ -107,6 +99,8 @@ func contains(sli []string, ele string) bool {
 
 // Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
 // any additional checks depending on the Config, and returns the payload.
+//
+// Verify does NOT do nonce validation, which is the callers responsibility.
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 //
@@ -208,19 +202,6 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	// Ensure that the payload returned by the square actually matches the payload parsed earlier.
 	if !bytes.Equal(gotPayload, payload) {
 		return nil, errors.New("oidc: internal error, payload parsed did not match previous payload")
-	}
-
-	// Check the nonce after we've verified the token. We don't want to allow unverified
-	// payloads to trigger a nonce lookup.
-	// If SkipNonceCheck is not set ClaimNonce cannot be Nil.
-	if !v.config.SkipNonceCheck && t.Nonce != "" {
-		if v.config.ClaimNonce != nil {
-			if err := v.config.ClaimNonce(t.Nonce); err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("oidc: Invalid configuration. ClaimNonce must be provided or SkipNonceCheck must be set.")
-		}
 	}
 
 	return t, nil

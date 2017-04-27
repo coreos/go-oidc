@@ -232,7 +232,8 @@ type IDToken struct {
 
 	// Initial nonce provided during the authentication redirect.
 	//
-	// If present, this package ensures this is a valid nonce.
+	// This package does NOT provided verification on the value of this field
+	// and it's the user's responsibility to ensure it contains a valid value.
 	Nonce string
 
 	// Raw payload of the id_token.

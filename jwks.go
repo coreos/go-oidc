@@ -125,8 +125,8 @@ func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey, expiry time.Time
 	return r.cachedKeys, r.expiry
 }
 
-// keys syncs the key set from the remote set, records the values in the cache, and
-// returns the
+// keysFromRemote syncs the key set from the remote set, records the values in the
+// cache, and returns the key set.
 func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, error) {
 	// Need to lock to inspect the inflight request field.
 	r.mu.Lock()
@@ -148,11 +148,12 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 			r.mu.Lock()
 			defer r.mu.Unlock()
 
-			// Don't invalid the cached keys.
 			if err == nil {
 				r.cachedKeys = keys
 				r.expiry = expiry
 			}
+
+			// Free inflight so a different request can run.
 			r.inflight = nil
 		}()
 	}
