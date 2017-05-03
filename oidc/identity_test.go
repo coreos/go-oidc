@@ -67,6 +67,40 @@ func TestIdentityFromClaims(t *testing.T) {
 				ExpiresAt: time.Time{},
 			},
 		},
+		{
+			claims: jose.Claims{
+				"sub":   "123850281",
+				"name":  "Elroy",
+				"email": "elroy@example.com",
+				"roles": "ROLE_ADMIN",
+			},
+			want: Identity{
+				ID:        "123850281",
+				Name:      "",
+				Email:     "elroy@example.com",
+				ExpiresAt: time.Time{},
+				ExtraClaims: jose.Claims{
+					"roles": "ROLE_ADMIN",
+				},
+			},
+		},
+		{
+			claims: jose.Claims{
+				"sub":   "123850281",
+				"name":  "Elroy",
+				"email": "elroy@example.com",
+				"roles": []string{"ROLE_ADMIN", "ROLE_BETA"},
+			},
+			want: Identity{
+				ID:        "123850281",
+				Name:      "",
+				Email:     "elroy@example.com",
+				ExpiresAt: time.Time{},
+				ExtraClaims: jose.Claims{
+					"roles": []string{"ROLE_ADMIN", "ROLE_BETA"},
+				},
+			},
+		},
 	}
 
 	for i, tt := range tests {

@@ -8,10 +8,11 @@ import (
 )
 
 type Identity struct {
-	ID        string
-	Name      string
-	Email     string
-	ExpiresAt time.Time
+	ID          string
+	Name        string
+	Email       string
+	ExpiresAt   time.Time
+	ExtraClaims jose.Claims
 }
 
 func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
@@ -38,6 +39,20 @@ func IdentityFromClaims(claims jose.Claims) (*Identity, error) {
 		return nil, err
 	} else if ok {
 		ident.ExpiresAt = exp
+	}
+
+	extraClaims := jose.Claims{}
+	for k, v := range claims {
+		switch k {
+		case "sub", "email", "exp", "name":
+		default:
+			extraClaims.Add(k, v)
+		}
+	}
+
+	// Don't retain a reference if no Extra Claims are present.
+	if len(extraClaims) > 0 {
+		ident.ExtraClaims = extraClaims
 	}
 
 	return &ident, nil
