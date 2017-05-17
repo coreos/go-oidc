@@ -606,6 +606,26 @@ type Client struct {
 	lastKeySetSync  time.Time
 }
 
+// CopyWithConfig will produce a copy of the existing client using
+// the given configuration. This is useful in scenarios where
+// a client has been initialized and synchonized with an OIDC
+// provider and now a new client is needed but we do not want to
+// re-synchronize.
+func (c *Client) CopyWithConfig(config *ClientConfig) (*Client, error) {
+	copy, err := NewClient(*config)
+	if err != nil {
+		return nil, err
+	}
+
+	c.keySetSyncMutex.Lock()
+	defer c.keySetSyncMutex.Unlock()
+
+	copy.keySet = c.keySet
+	copy.lastKeySetSync = c.lastKeySetSync
+
+	return copy, nil
+}
+
 func (c *Client) Healthy() error {
 	now := time.Now().UTC()
 
