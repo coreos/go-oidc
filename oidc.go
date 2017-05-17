@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -79,11 +80,22 @@ type providerJSON struct {
 	UserInfoURL string `json:"userinfo_endpoint"`
 }
 
+// ProviderOptions allows modifying issuer retuned from well-known openid config.
+type ProviderOptions interface {
+	RenderIssuer(issuer string) string
+}
+
+// ProviderOptionsFunc is an adapter to allow the use of ordinary functions as ProviderOptions
+type ProviderOptionsFunc func(issuer string) string
+func (f ProviderOptionsFunc) RenderIssuer(issuer string) string {
+	return f(issuer)
+}
+
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
 //
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
-func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
+func NewProvider(ctx context.Context, issuer string, options ...ProviderOptions) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	req, err := http.NewRequest("GET", wellKnown, nil)
 	if err != nil {
@@ -106,7 +118,10 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		return nil, fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
 	}
 	if p.Issuer != issuer {
-		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
+		log.Printf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
+		for _, opt := range options {
+			p.Issuer = opt.RenderIssuer(p.Issuer)
+		}
 	}
 	return &Provider{
 		issuer:       p.Issuer,
