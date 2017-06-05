@@ -1,6 +1,9 @@
 package jose
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 type JWT JWS
 
@@ -13,29 +16,22 @@ func ParseJWT(token string) (jwt JWT, err error) {
 	return JWT(jws), nil
 }
 
-func NewJWT(header JOSEHeader, claims Claims) (jwt JWT, err error) {
+func NewJWT(header JOSEHeader, claims interface{}) (jwt JWT, err error) {
 	jwt = JWT{}
 
 	jwt.Header = header
 	jwt.Header[HeaderMediaType] = "JWT"
 
-	claimBytes, err := marshalClaims(claims)
-	if err != nil {
+	if jwt.Payload, err = json.Marshal(claims); err != nil {
 		return
 	}
-	jwt.Payload = claimBytes
+	jwt.RawPayload = encodeSegment(jwt.Payload)
 
 	eh, err := encodeHeader(header)
 	if err != nil {
 		return
 	}
 	jwt.RawHeader = eh
-
-	ec, err := encodeClaims(claims)
-	if err != nil {
-		return
-	}
-	jwt.RawPayload = ec
 
 	return
 }
@@ -61,7 +57,7 @@ func (j *JWT) Encode() string {
 	return strings.Join([]string{d, s}, ".")
 }
 
-func NewSignedJWT(claims Claims, s Signer) (*JWT, error) {
+func NewSignedJWT(claims interface{}, s Signer) (*JWT, error) {
 	header := JOSEHeader{
 		HeaderKeyAlgorithm: s.Alg(),
 		HeaderKeyID:        s.ID(),

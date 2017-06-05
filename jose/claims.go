@@ -107,20 +107,3 @@ func decodeClaims(payload []byte) (Claims, error) {
 	}
 	return c, nil
 }
-
-func marshalClaims(c Claims) ([]byte, error) {
-	b, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func encodeClaims(c Claims) (string, error) {
-	b, err := marshalClaims(c)
-	if err != nil {
-		return "", err
-	}
-
-	return encodeSegment(b), nil
-}
