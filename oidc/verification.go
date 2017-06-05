@@ -69,8 +69,15 @@ func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
 	// iat REQUIRED. Time at which the JWT was issued.
 	// Its value is a JSON number representing the number of seconds from 1970-01-01T0:0:0Z
 	// as measured in UTC until the date/time.
-	if _, exists := claims["iat"].(float64); !exists {
+	if iat, ok := claims["iat"]; !ok {
 		return errors.New("missing claim: 'iat'")
+	} else {
+		// Ensure the claim is either a float or an int.
+		switch iat.(type) {
+		case float64, int64, int32, int:
+		default:
+			return errors.New("missing claim: 'iat'")
+		}
 	}
 
 	// aud REQUIRED. Audience(s) that this ID Token is intended for.

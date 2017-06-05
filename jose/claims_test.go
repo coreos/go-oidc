@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/jonboulle/clockwork"
 )
 
 func TestString(t *testing.T) {
@@ -323,6 +325,42 @@ func TestStringArray(t *testing.T) {
 
 		if !reflect.DeepEqual(tt.val, val) {
 			t.Errorf("case %d: want val=%v, got val=%v", i, tt.val, val)
+		}
+	}
+}
+
+func TestEncodeDecodeRoundTrip(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+
+	tests := []struct {
+		claims Claims
+	}{
+		{
+			claims: Claims{
+				"iat": clock.Now().Unix(),
+			},
+		},
+		{
+			claims: Claims{
+				"iat": clock.Now().Unix(),
+				"exp": clock.Now().Add(time.Hour).Unix(),
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		payload, err := marshalClaims(tt.claims)
+		if err != nil {
+			t.Errorf("case %d: failed to marshal claims: %v", i, err)
+			return
+		}
+		got, err := decodeClaims(payload)
+		if err != nil {
+			t.Errorf("case %d: failed to decode claims: %v", i, err)
+			return
+		}
+		if !reflect.DeepEqual(tt.claims, got) {
+			t.Errorf("case %d: want val=%v, got val=%v", i, tt.claims, got)
 		}
 	}
 }
