@@ -232,7 +232,6 @@ func TestJWTVerifier(t *testing.T) {
 			jwt:     newJWT(iss, "XXX", "YYY", past12, future12, priv1.Signer()),
 			wantErr: true,
 		},
-
 		{
 			name: "JWT signed with available key",
 			verifier: JWTVerifier{

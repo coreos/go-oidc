@@ -59,7 +59,7 @@ func TestProviderSyncRace(t *testing.T) {
 	}
 
 	if !cli.providerConfig.Get().Empty() {
-		t.Errorf("want c.ProviderConfig == nil, got c.ProviderConfig=%#v")
+		t.Errorf("want c.ProviderConfig == nil, got c.ProviderConfig=%#v", cli.providerConfig)
 	}
 
 	// SyncProviderConfig beings a goroutine which writes to the client's provider config.
