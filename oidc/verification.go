@@ -36,9 +36,9 @@ func containsString(needle string, haystack []string) bool {
 	return false
 }
 
-// Verify claims in accordance with OIDC spec
+// VerifyClaims claims in accordance with OIDC spec
 // http://openid.net/specs/openid-connect-basic-1_0.html#IDTokenValidation
-func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
+func VerifyClaims(jwt jose.JWT, issuer, clientID string, skipClientID bool) error {
 	now := time.Now().UTC()
 
 	claims, err := jwt.Claims()
@@ -60,7 +60,7 @@ func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
 	// host, and optionally, port number and path components and no query or fragment components.
 	if iss, exists := claims["iss"].(string); exists {
 		if !urlEqual(iss, issuer) {
-			return fmt.Errorf("invalid claim value: 'iss'. expected=%s, found=%s.", issuer, iss)
+			return fmt.Errorf("Invalid claim value: 'iss'. expected=%s, found=%s", issuer, iss)
 		}
 	} else {
 		return errors.New("missing claim: 'iss'")
@@ -78,16 +78,18 @@ func VerifyClaims(jwt jose.JWT, issuer, clientID string) error {
 	// It MAY also contain identifiers for other audiences. In the general case, the aud
 	// value is an array of case sensitive strings. In the common special case when there
 	// is one audience, the aud value MAY be a single case sensitive string.
-	if aud, ok, err := claims.StringClaim("aud"); err == nil && ok {
-		if aud != clientID {
-			return fmt.Errorf("invalid claims, 'aud' claim and 'client_id' do not match, aud=%s, client_id=%s", aud, clientID)
+	if !skipClientID {
+		if aud, ok, err := claims.StringClaim("aud"); err == nil && ok {
+			if aud != clientID {
+				return fmt.Errorf("invalid claims, 'aud' claim and 'client_id' do not match, aud=%s, client_id=%s", aud, clientID)
+			}
+		} else if aud, ok, err := claims.StringsClaim("aud"); err == nil && ok {
+			if !containsString(clientID, aud) {
+				return fmt.Errorf("invalid claims, cannot find 'client_id' in 'aud' claim, aud=%v, client_id=%s", aud, clientID)
+			}
+		} else {
+			return errors.New("invalid claim value: 'aud' is required, and should be either string or string array")
 		}
-	} else if aud, ok, err := claims.StringsClaim("aud"); err == nil && ok {
-		if !containsString(clientID, aud) {
-			return fmt.Errorf("invalid claims, cannot find 'client_id' in 'aud' claim, aud=%v, client_id=%s", aud, clientID)
-		}
-	} else {
-		return errors.New("invalid claim value: 'aud' is required, and should be either string or string array")
 	}
 
 	return nil
@@ -142,29 +144,34 @@ func VerifyClientClaims(jwt jose.JWT, issuer string) (string, error) {
 	return sub, nil
 }
 
+// JWTVerifier is a verifications checker
 type JWTVerifier struct {
-	issuer   string
-	clientID string
-	syncFunc func() error
-	keysFunc func() []key.PublicKey
-	clock    clockwork.Clock
+	issuer            string
+	clientID          string
+	skipClientIDCheck bool
+	syncFunc          func() error
+	keysFunc          func() []key.PublicKey
+	clock             clockwork.Clock
 }
 
-func NewJWTVerifier(issuer, clientID string, syncFunc func() error, keysFunc func() []key.PublicKey) JWTVerifier {
+// NewJWTVerifier returns a JWT verifier
+func NewJWTVerifier(issuer, clientID string, syncFunc func() error, keysFunc func() []key.PublicKey, skipClientID bool) JWTVerifier {
 	return JWTVerifier{
-		issuer:   issuer,
-		clientID: clientID,
-		syncFunc: syncFunc,
-		keysFunc: keysFunc,
-		clock:    clockwork.NewRealClock(),
+		issuer:            issuer,
+		clientID:          clientID,
+		syncFunc:          syncFunc,
+		keysFunc:          keysFunc,
+		skipClientIDCheck: skipClientID,
+		clock:             clockwork.NewRealClock(),
 	}
 }
 
+// Verify is responsible for verifying the token
 func (v *JWTVerifier) Verify(jwt jose.JWT) error {
 	// Verify claims before verifying the signature. This is an optimization to throw out
 	// tokens we know are invalid without undergoing an expensive signature check and
 	// possibly a re-sync event.
-	if err := VerifyClaims(jwt, v.issuer, v.clientID); err != nil {
+	if err := VerifyClaims(jwt, v.issuer, v.clientID, v.skipClientIDCheck); err != nil {
 		return fmt.Errorf("oidc: JWT claims invalid: %v", err)
 	}
 

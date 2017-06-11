@@ -165,7 +165,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
 			}
 		} else {
-			return nil, fmt.Errorf("oidc: Invalid configuration. ClientID must be provided or SkipClientIDCheck must be set.")
+			return nil, fmt.Errorf("oidc: Invalid configuration. ClientID must be provided or SkipClientIDCheck must be set")
 		}
 	}
 

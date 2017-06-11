@@ -556,12 +556,13 @@ func (c *ClientRegistrationResponse) UnmarshalJSON(data []byte) error {
 }
 
 type ClientConfig struct {
-	HTTPClient     phttp.Client
-	Credentials    ClientCredentials
-	Scope          []string
-	RedirectURL    string
-	ProviderConfig ProviderConfig
-	KeySet         key.PublicKeySet
+	Credentials       ClientCredentials
+	HTTPClient        phttp.Client
+	KeySet            key.PublicKeySet
+	ProviderConfig    ProviderConfig
+	RedirectURL       string
+	Scope             []string
+	SkipClientIDCheck bool
 }
 
 func NewClient(cfg ClientConfig) (*Client, error) {
@@ -579,6 +580,7 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 		redirectURL:    ru.String(),
 		providerConfig: newProviderConfigRepo(cfg.ProviderConfig),
 		keySet:         cfg.KeySet,
+		skipClientID:   cfg.SkipClientIDCheck,
 	}
 
 	if c.httpClient == nil {
@@ -593,19 +595,21 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 	return &c, nil
 }
 
+// Client is the oidc client
 type Client struct {
-	httpClient     phttp.Client
-	providerConfig *providerConfigRepo
-	credentials    ClientCredentials
-	redirectURL    string
-	scope          []string
-	keySet         key.PublicKeySet
-	providerSyncer *ProviderConfigSyncer
-
+	credentials     ClientCredentials
+	httpClient      phttp.Client
+	keySet          key.PublicKeySet
 	keySetSyncMutex sync.RWMutex
 	lastKeySetSync  time.Time
+	providerConfig  *providerConfigRepo
+	providerSyncer  *ProviderConfigSyncer
+	redirectURL     string
+	scope           []string
+	skipClientID    bool
 }
 
+// Healthy checks the provider is healthy
 func (c *Client) Healthy() error {
 	now := time.Now().UTC()
 
@@ -622,6 +626,7 @@ func (c *Client) Healthy() error {
 	return nil
 }
 
+// OAuthClient returns a oauth2 client
 func (c *Client) OAuthClient() (*oauth2.Client, error) {
 	cfg := c.providerConfig.Get()
 	authMethod, err := chooseAuthMethod(cfg)
@@ -771,10 +776,11 @@ func (c *Client) RefreshToken(refreshToken string) (jose.JWT, error) {
 	return jwt, c.VerifyJWT(jwt)
 }
 
+// VerifyJWT verifies the JWT tokens
 func (c *Client) VerifyJWT(jwt jose.JWT) error {
 	var keysFunc func() []key.PublicKey
-	if kID, ok := jwt.KeyID(); ok {
-		keysFunc = c.keysFuncWithID(kID)
+	if kid, ok := jwt.KeyID(); ok {
+		keysFunc = c.keysFuncWithID(kid)
 	} else {
 		keysFunc = c.keysFuncAll()
 	}
@@ -782,7 +788,9 @@ func (c *Client) VerifyJWT(jwt jose.JWT) error {
 	v := NewJWTVerifier(
 		c.providerConfig.Get().Issuer.String(),
 		c.credentials.ID,
-		c.maybeSyncKeys, keysFunc)
+		c.maybeSyncKeys,
+		keysFunc,
+		c.skipClientID)
 
 	return v.Verify(jwt)
 }
