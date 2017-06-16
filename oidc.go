@@ -149,6 +149,11 @@ func (p *Provider) Endpoint() oauth2.Endpoint {
 	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL}
 }
 
+// Issuer returns the OAuth2 issuer claim for the given provider.
+func (p *Provider) Issuer() string {
+	return p.issuer
+}
+
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
 	Subject       string `json:"sub"`
