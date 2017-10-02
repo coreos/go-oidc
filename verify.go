@@ -120,7 +120,7 @@ func contains(sli []string, ele string) bool {
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: mallformed jwt: %v", err)
+		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
 
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
