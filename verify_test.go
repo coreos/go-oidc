@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -13,7 +14,11 @@ type testVerifier struct {
 	jwk jose.JSONWebKey
 }
 
-func (t *testVerifier) verify(ctx context.Context, jws *jose.JSONWebSignature) ([]byte, error) {
+func (t *testVerifier) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
+	jws, err := jose.ParseSigned(jwt)
+	if err != nil {
+		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+	}
 	return jws.Verify(&t.jwk)
 }
 
@@ -217,7 +222,7 @@ func (v verificationTest) run(t *testing.T) {
 	if v.issuer != "" {
 		issuer = v.issuer
 	}
-	var ks keySet
+	var ks KeySet
 	if v.verificationKey == nil {
 		ks = &testVerifier{v.signKey.jwk()}
 	} else {
