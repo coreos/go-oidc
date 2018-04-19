@@ -40,6 +40,18 @@ func TestVerify(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "skip verify invalid issuer",
+			issuer:  "https://bar",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+				SkipVerifyIssuer: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: false,
+		},
+		{
 			name:    "invalid sig",
 			idToken: `{"iss":"https://foo"}`,
 			config: Config{
