@@ -172,7 +172,7 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 	}
 }
 
-func TestCacheControl(t *testing.T) {
+func TestCacheControl(t *testing.T) { // nolint cyclomatic complexity
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

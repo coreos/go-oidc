@@ -36,9 +36,10 @@ type KeySet interface {
 
 // IDTokenVerifier provides verification for ID Tokens.
 type IDTokenVerifier struct {
-	keySet KeySet
-	config *Config
-	issuer string
+	keySet           KeySet
+	config           *Config
+	issuer           string
+	OriginThirdParty ThirdParty
 }
 
 // NewVerifier returns a verifier manually constructed from a key set and issuer URL.
@@ -63,8 +64,8 @@ type IDTokenVerifier struct {
 //		// Verifier uses the custom KeySet implementation.
 //		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
 //
-func NewVerifier(issuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
-	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL}
+func NewVerifier(issuerURL string, keySet KeySet, config *Config, third ThirdParty) *IDTokenVerifier {
+	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL, OriginThirdParty: third}
 }
 
 // Config is the configuration for an IDTokenVerifier.
@@ -94,7 +95,7 @@ type Config struct {
 // The returned IDTokenVerifier is tied to the Provider's context and its behavior is
 // undefined once the Provider's context is canceled.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
-	return NewVerifier(p.issuer, p.remoteKeySet, config)
+	return NewVerifier(p.issuer, p.remoteKeySet, config, p.OriginThirdParty)
 }
 
 func parseJWT(p string) ([]byte, error) {
@@ -138,7 +139,7 @@ func contains(sli []string, ele string) bool {
 //
 //    token, err := verifier.Verify(ctx, rawIDToken)
 //
-func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
+func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) { // nolint cyclomatic complexity
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
@@ -166,15 +167,17 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		claims:          payload,
 	}
 
-	// Check issuer.
-	if t.Issuer != v.issuer {
-		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
-		// the required "https://accounts.google.com". Detect this case and allow it only
-		// for Google.
-		//
-		// We will not add hooks to let other providers go off spec like this.
-		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
-			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+	if v.OriginThirdParty != Microsoft {
+		// Check issuer.
+		if t.Issuer != v.issuer {
+			// Google sometimes returns "accounts.google.com" as the issuer claim instead of
+			// the required "https://accounts.google.com". Detect this case and allow it only
+			// for Google.
+			//
+			// We will not add hooks to let other providers go off spec like this.
+			if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
+				return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+			}
 		}
 	}
 

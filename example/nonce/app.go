@@ -92,7 +92,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Write(data)
+		w.Write(data) // nolint
 	})
 
 	log.Printf("listening on http://%s/", "127.0.0.1:5556")

@@ -101,7 +101,7 @@ func (r *remoteKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 	return r.verify(ctx, jws)
 }
 
-func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) ([]byte, error) {
+func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) ([]byte, error) { // nolint cyclomatic complexity
 	// We don't support JWTs signed with multiple signatures.
 	keyID := ""
 	for _, sig := range jws.Signatures {
@@ -199,7 +199,9 @@ func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: get keys failed %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
