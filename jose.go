@@ -4,6 +4,7 @@
 
 package oidc
 
+// nolint
 const (
 	// JOSE asymmetric signing algorithm values as defined by RFC 7518
 	//

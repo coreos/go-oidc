@@ -20,6 +20,14 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 )
 
+// ThirdParty is a type which contains all the Third Party that we use OAuth with
+type ThirdParty string
+
+const (
+	Google    ThirdParty = "Google"    //nolint
+	Microsoft ThirdParty = "Microsoft" //nolint
+)
+
 const (
 	// ScopeOpenID is the mandatory scope for all OpenID Connect OAuth2 requests.
 	ScopeOpenID = "openid"
@@ -32,7 +40,8 @@ const (
 	// authorization request instead.
 	//
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess
-	ScopeOfflineAccess = "offline_access"
+	ScopeOfflineAccess   = "offline_access"
+	microsoftUserInfoURL = "https://graph.microsoft.com/v1.0/me"
 )
 
 var (
@@ -74,11 +83,13 @@ type Provider struct {
 	rawClaims []byte
 
 	remoteKeySet KeySet
+
+	OriginThirdParty ThirdParty
 }
 
-type cachedKeys struct {
-	keys   []jose.JSONWebKey
-	expiry time.Time
+type cachedKeys struct { // nolint
+	keys   []jose.JSONWebKey // nolint
+	expiry time.Time         // nolint
 }
 
 type providerJSON struct {
@@ -93,7 +104,7 @@ type providerJSON struct {
 //
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
-func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
+func NewProvider(ctx context.Context, issuer string, third ThirdParty) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	req, err := http.NewRequest("GET", wellKnown, nil)
 	if err != nil {
@@ -103,7 +114,9 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -120,16 +133,21 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		return nil, fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
 	}
 
-	if p.Issuer != issuer {
-		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
+	var userInfoURL = microsoftUserInfoURL
+	if third != Microsoft {
+		if p.Issuer != issuer {
+			return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
+		}
+		userInfoURL = p.UserInfoURL
 	}
 	return &Provider{
-		issuer:       p.Issuer,
-		authURL:      p.AuthURL,
-		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
-		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		issuer:           p.Issuer,
+		authURL:          p.AuthURL,
+		tokenURL:         p.TokenURL,
+		userInfoURL:      userInfoURL,
+		rawClaims:        body,
+		remoteKeySet:     NewRemoteKeySet(ctx, p.JWKSURL),
+		OriginThirdParty: third,
 	}, nil
 }
 
@@ -160,12 +178,30 @@ func (p *Provider) Endpoint() oauth2.Endpoint {
 
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
-	Subject       string `json:"sub"`
-	Profile       string `json:"profile"`
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
+	Subject     string `json:"sub"`
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+	GivenName   string `json:"givenName"`
+	FamilyName  string `json:"familyName"`
 
 	claims []byte
+}
+
+type googleUserInfo struct {
+	Subject       string `json:"sub"`
+	DisplayName   string `json:"name"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+}
+
+type microsoftUserInfo struct {
+	Subject     string `json:"sub"`
+	DisplayName string `json:"displayName"`
+	Email       string `json:"userPrincipalName"`
+	GivenName   string `json:"givenName"`
+	FamilyName  string `json:"surname"`
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -197,7 +233,9 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -206,12 +244,44 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		return nil, fmt.Errorf("%s: %s", resp.Status, body)
 	}
 
-	var userInfo UserInfo
-	if err := json.Unmarshal(body, &userInfo); err != nil {
+	switch p.OriginThirdParty {
+	case Google:
+		return getGoogleUserInfo(body)
+	case Microsoft:
+		return getMicrosoftUserInfo(body)
+	default:
+		return nil, errors.New("OriginThirdParty doesn't match an authorized case")
+	}
+}
+
+func getGoogleUserInfo(body []byte) (*UserInfo, error) {
+	var g googleUserInfo
+	if err := json.Unmarshal(body, &g); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
-	userInfo.claims = body
-	return &userInfo, nil
+	return &UserInfo{
+		Subject:     g.Subject,
+		DisplayName: g.DisplayName,
+		Email:       g.Email,
+		GivenName:   g.GivenName,
+		FamilyName:  g.FamilyName,
+		claims:      body,
+	}, nil
+}
+
+func getMicrosoftUserInfo(body []byte) (*UserInfo, error) {
+	var m microsoftUserInfo
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
+	}
+	return &UserInfo{
+		Subject:     m.Subject,
+		DisplayName: m.DisplayName,
+		Email:       m.Email,
+		GivenName:   m.GivenName,
+		FamilyName:  m.FamilyName,
+		claims:      body,
+	}, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
@@ -303,7 +373,7 @@ func (i *IDToken) VerifyAccessToken(accessToken string) error {
 	default:
 		return fmt.Errorf("oidc: unsupported signing algorithm %q", i.sigAlgorithm)
 	}
-	h.Write([]byte(accessToken)) // hash documents that Write will never return an error
+	h.Write([]byte(accessToken)) // nolint - hash documents that Write will never return an error
 	sum := h.Sum(nil)[:h.Size()/2]
 	actual := base64.RawURLEncoding.EncodeToString(sum)
 	if actual != i.AccessTokenHash {
