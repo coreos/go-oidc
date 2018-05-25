@@ -155,15 +155,30 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		return nil, fmt.Errorf("oidc: failed to unmarshal claims: %v", err)
 	}
 
+	distributedClaims := make(map[string]claimSource)
+
+	//step through the token to map claim names to claim sources"
+	for cn, src := range token.ClaimNames {
+		if src == "" {
+			return nil, fmt.Errorf("oidc: failed to obtain source from claim name")
+		}
+		s, ok := token.ClaimSources[src]
+		if !ok {
+			return nil, fmt.Errorf("oidc: source does not exist")
+		}
+		distributedClaims[cn] = s
+	}
+
 	t := &IDToken{
-		Issuer:          token.Issuer,
-		Subject:         token.Subject,
-		Audience:        []string(token.Audience),
-		Expiry:          time.Time(token.Expiry),
-		IssuedAt:        time.Time(token.IssuedAt),
-		Nonce:           token.Nonce,
-		AccessTokenHash: token.AtHash,
-		claims:          payload,
+		Issuer:            token.Issuer,
+		Subject:           token.Subject,
+		Audience:          []string(token.Audience),
+		Expiry:            time.Time(token.Expiry),
+		IssuedAt:          time.Time(token.IssuedAt),
+		Nonce:             token.Nonce,
+		AccessTokenHash:   token.AtHash,
+		claims:            payload,
+		distributedClaims: distributedClaims,
 	}
 
 	// Check issuer.
