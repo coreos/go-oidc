@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -204,16 +205,141 @@ func TestAccessTokenHash(t *testing.T) {
 		signKey: newRSAKey(t),
 	}
 	t.Run("at_hash", func(t *testing.T) {
-		tok := vt.runGetToken(t)
-		if tok != nil {
-			if tok.AccessTokenHash != atHash {
-				t.Errorf("access token hash not preserved correctly, want %q got %q", atHash, tok.AccessTokenHash)
-			}
-			if tok.sigAlgorithm != RS256 {
-				t.Errorf("invalid signature algo, want %q got %q", RS256, tok.sigAlgorithm)
-			}
+		tok, err := vt.runGetToken(t)
+		if err != nil {
+			t.Errorf("parsing token: %v", err)
+			return
+		}
+		if tok.AccessTokenHash != atHash {
+			t.Errorf("access token hash not preserved correctly, want %q got %q", atHash, tok.AccessTokenHash)
+		}
+		if tok.sigAlgorithm != RS256 {
+			t.Errorf("invalid signature algo, want %q got %q", RS256, tok.sigAlgorithm)
 		}
 	})
+}
+
+func TestDistributedClaims(t *testing.T) {
+	tests := []struct {
+		test    verificationTest
+		want    map[string]claimSource
+		wantErr bool
+	}{
+		{
+			test: verificationTest{
+				name:    "NoDistClaims",
+				idToken: `{"iss":"https://foo","aud":"client1"}`,
+				config: Config{
+					ClientID:        "client1",
+					SkipExpiryCheck: true,
+				},
+				signKey: newRSAKey(t),
+			},
+			want: map[string]claimSource{},
+		},
+		{
+			test: verificationTest{
+				name: "1DistClaim",
+				idToken: `{
+							"iss":"https://foo","aud":"client1",
+							"_claim_names": {
+							    "address": "src1"
+						 	},
+						 	"_claim_sources": {
+							    "src1": {"endpoint": "123", "access_token":"1234"}
+							}
+						  }`,
+				config: Config{
+					ClientID:        "client1",
+					SkipExpiryCheck: true,
+				},
+				signKey: newRSAKey(t),
+			},
+			want: map[string]claimSource{
+				"address": claimSource{Endpoint: "123", AccessToken: "1234"},
+			},
+		},
+		{
+			test: verificationTest{
+				name: "2DistClaims1Src",
+				idToken: `{
+							"iss":"https://foo","aud":"client1",
+							"_claim_names": {
+							    "address": "src1",
+							    "phone_number": "src1"
+						 	},
+						 	"_claim_sources": {
+								"src1": {"endpoint": "123", "access_token":"1234"}
+							}
+						  }`,
+				config: Config{
+					ClientID:        "client1",
+					SkipExpiryCheck: true,
+				},
+				signKey: newRSAKey(t),
+			},
+			want: map[string]claimSource{
+				"address":      claimSource{Endpoint: "123", AccessToken: "1234"},
+				"phone_number": claimSource{Endpoint: "123", AccessToken: "1234"},
+			},
+		},
+		{
+			test: verificationTest{
+				name: "1Name0Src",
+				idToken: `{
+							"iss":"https://foo","aud":"client1",
+							"_claim_names": {
+								"address": "src1"
+						 	},
+							"_claim_sources": {
+							}
+						  }`,
+				config: Config{
+					ClientID:        "client1",
+					SkipExpiryCheck: true,
+				},
+				signKey: newRSAKey(t),
+			},
+			wantErr: true,
+		},
+		{
+			test: verificationTest{
+				name: "NoNames1Src",
+				idToken: `{
+							"iss":"https://foo","aud":"client1",
+							"_claim_names": {
+						 	},
+						 	"_claim_sources": {
+								"src1": {"endpoint": "https://foo", "access_token":"1234"}
+							}
+						  }`,
+				config: Config{
+					ClientID:        "client1",
+					SkipExpiryCheck: true,
+				},
+				signKey: newRSAKey(t),
+			},
+			want: map[string]claimSource{},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.test.name, func(t *testing.T) {
+			idToken, err := test.test.runGetToken(t)
+			if err != nil {
+				if !test.wantErr {
+					t.Errorf("parsing token: %v", err)
+				}
+				return
+			}
+			if test.wantErr {
+				t.Errorf("expected error parsing token")
+				return
+			}
+			if !reflect.DeepEqual(idToken.distributedClaims, test.want) {
+				t.Errorf("expected distributed claim: %#v, got: %#v", test.want, idToken.distributedClaims)
+			}
+		})
+	}
 }
 
 type verificationTest struct {
@@ -236,7 +362,7 @@ type verificationTest struct {
 	wantErr bool
 }
 
-func (v verificationTest) runGetToken(t *testing.T) *IDToken {
+func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 	token := v.signKey.sign(t, []byte(v.idToken))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -254,19 +380,15 @@ func (v verificationTest) runGetToken(t *testing.T) *IDToken {
 	}
 	verifier := NewVerifier(issuer, ks, &v.config)
 
-	idToken, err := verifier.Verify(ctx, token)
-	if err != nil {
-		if !v.wantErr {
-			t.Errorf("%s: verify %v", v.name, err)
-		}
-	} else {
-		if v.wantErr {
-			t.Errorf("%s: expected error", v.name)
-		}
-	}
-	return idToken
+	return verifier.Verify(ctx, token)
 }
 
 func (v verificationTest) run(t *testing.T) {
-	v.runGetToken(t)
+	_, err := v.runGetToken(t)
+	if err != nil && !v.wantErr {
+		t.Errorf("%v", err)
+	}
+	if err == nil && v.wantErr {
+		t.Errorf("expected error")
+	}
 }
