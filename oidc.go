@@ -133,6 +133,18 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	}, nil
 }
 
+// NewProviderWithoutDiscovery creates a provider in case the OIDC Discovery Profile is not offered by the issuer
+func NewProviderWithoutDiscovery(ctx context.Context, issuer string, authURL string, tokenURL string, userInfoURL string, jwksURL string)(*Provider, error){
+	fmt.Println("NewProviderWithoutDiscovery()")
+	return &Provider{
+		issuer: issuer,
+		authURL: authURL,
+		tokenURL: tokenURL,
+		userInfoURL: userInfoURL,
+		remoteKeySet: NewRemoteKeySet(ctx, jwksURL),
+	}, nil
+}
+
 // Claims unmarshals raw fields returned by the server during discovery.
 //
 //    var claims struct {
