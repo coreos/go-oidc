@@ -129,7 +129,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		tokenURL:     p.TokenURL,
 		userInfoURL:  p.UserInfoURL,
 		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		remoteKeySet: NewRemoteKeySet(p.JWKSURL),
 	}, nil
 }
 
