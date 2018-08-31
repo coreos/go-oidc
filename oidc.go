@@ -176,6 +176,19 @@ func (u *UserInfo) Claims(v interface{}) error {
 	return json.Unmarshal(u.claims, v)
 }
 
+// EncodedClaimsJSON returns claims JSON in base64-encoded form
+func (u *UserInfo) EncodedClaimsJSON() (json.RawMessage, error) {
+	if u.claims == nil {
+		return nil, errors.New("oidc: claims not set")
+	}
+	cj, err := json.Marshal(u.claims)
+	if err != nil {
+		return nil, errors.New("oidc: problem marshalling claims to JSON: " + err.Error())
+	}
+
+	return cj, nil
+}
+
 // UserInfo uses the token source to query the provider's user info endpoint.
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource) (*UserInfo, error) {
 	if p.userInfoURL == "" {
