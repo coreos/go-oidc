@@ -257,7 +257,6 @@ func (c *Client) RequestToken(grantType, value string) (result TokenResponse, er
 	v := c.commonURLValues()
 
 	v.Set("grant_type", grantType)
-	v.Set("client_secret", c.creds.Secret)
 	switch grantType {
 	case GrantTypeAuthCode:
 		v.Set("code", value)
