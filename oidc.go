@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,10 +66,13 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer      string
-	authURL     string
-	tokenURL    string
-	userInfoURL string
+	issuer          string
+	authURL         string
+	tokenURL        string
+	userInfoURL     string
+	registrationURL string
+
+	scopesSupported []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -82,11 +86,13 @@ type cachedKeys struct {
 }
 
 type providerJSON struct {
-	Issuer      string `json:"issuer"`
-	AuthURL     string `json:"authorization_endpoint"`
-	TokenURL    string `json:"token_endpoint"`
-	JWKSURL     string `json:"jwks_uri"`
-	UserInfoURL string `json:"userinfo_endpoint"`
+	Issuer          string   `json:"issuer"`
+	AuthURL         string   `json:"authorization_endpoint"`
+	TokenURL        string   `json:"token_endpoint"`
+	JWKSURL         string   `json:"jwks_uri"`
+	UserInfoURL     string   `json:"userinfo_endpoint"`
+	RegistrationURL string   `json:"registration_endpoint"`
+	ScopesSupported []string `json:"scopes_supported"`
 }
 
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
@@ -124,12 +130,14 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
 	}
 	return &Provider{
-		issuer:       p.Issuer,
-		authURL:      p.AuthURL,
-		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
-		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		issuer:          p.Issuer,
+		authURL:         p.AuthURL,
+		tokenURL:        p.TokenURL,
+		userInfoURL:     p.UserInfoURL,
+		registrationURL: p.RegistrationURL,
+		scopesSupported: p.ScopesSupported,
+		rawClaims:       body,
+		remoteKeySet:    NewRemoteKeySet(ctx, p.JWKSURL),
 	}, nil
 }
 
@@ -368,6 +376,10 @@ func (j *jsonTime) UnmarshalJSON(b []byte) error {
 	}
 	*j = jsonTime(time.Unix(unix, 0))
 	return nil
+}
+
+func (j jsonTime) MarshalJSON() ([]byte, error) {
+	return json.Marshal(json.Number(strconv.FormatInt(time.Time(j).Unix(), 10)))
 }
 
 func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
