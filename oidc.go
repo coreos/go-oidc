@@ -20,6 +20,11 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 )
 
+// HTTPClient to support diference http clients
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 const (
 	// ScopeOpenID is the mandatory scope for all OpenID Connect OAuth2 requests.
 	ScopeOpenID = "openid"
@@ -51,13 +56,14 @@ var (
 //    // This will use the custom client
 //    provider, err := oidc.NewProvider(ctx, "https://accounts.example.com")
 //
-func ClientContext(ctx context.Context, client *http.Client) context.Context {
+func ClientContext(ctx context.Context, client HTTPClient) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
 }
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
-	client := http.DefaultClient
-	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
+	var client HTTPClient
+	client = http.DefaultClient
+	if c, ok := ctx.Value(oauth2.HTTPClient).(HTTPClient); ok {
 		client = c
 	}
 	return client.Do(req.WithContext(ctx))
