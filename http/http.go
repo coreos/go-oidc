@@ -93,7 +93,7 @@ func expires(date, expires string) (time.Duration, bool, error) {
 
 	var te time.Time
 	var err error
-	if expires == "0" {
+	if expires == "0" || expires == "-1" {
 		return 0, false, nil
 	}
 	te, err = time.Parse(time.RFC1123, expires)

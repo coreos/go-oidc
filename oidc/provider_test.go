@@ -475,7 +475,7 @@ func (g *fakeProviderConfigGetterSetter) Set(cfg ProviderConfig) error {
 type fakeProviderConfigHandler struct {
 	cfg       ProviderConfig
 	maxAge    time.Duration
-	noExpires bool
+	customExpiration string
 }
 
 func (s *fakeProviderConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -483,8 +483,8 @@ func (s *fakeProviderConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	if s.maxAge.Seconds() >= 0 {
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(s.maxAge.Seconds())))
 	}
-	if s.noExpires {
-		w.Header().Set("Expires", "0")
+	if s.customExpiration != "" {
+		w.Header().Set("Expires", s.customExpiration)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
@@ -559,7 +559,7 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 		dsc       string
 		age       time.Duration
 		cfg       ProviderConfig
-		noExpires bool
+		customExpiration string
 		ok        bool
 	}{
 		// everything is good
@@ -610,7 +610,18 @@ func TestHTTPProviderConfigGetter(t *testing.T) {
 				ExpiresAt: now.Add(time.Minute),
 			},
 			ok:        true,
-			noExpires: true,
+			customExpiration: "0",
+		},
+		// An expires header set to -1
+		{
+			dsc: "https://example.com",
+			age: time.Minute,
+			cfg: ProviderConfig{
+				Issuer:    &url.URL{Scheme: "https", Host: "example.com"},
+				ExpiresAt: now.Add(time.Minute),
+			},
+			ok:        true,
+			customExpiration: "-1",
 		},
 	}
 
