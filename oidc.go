@@ -162,7 +162,7 @@ func (p *Provider) Endpoint() oauth2.Endpoint {
 	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL}
 }
 
-// LogoutEndpoint returns the logout endpoints for the given provider.
+// LogoutURL returns the logout endpoints for the given provider.
 // See: https://openid.net/specs/openid-connect-session-1_0.html#RPLogout
 func (p *Provider) LogoutURL(idTokenHint string, redirectURL string, state string) string {
 	logoutURL, err := url.Parse(p.logoutURL)
