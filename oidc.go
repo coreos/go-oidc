@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -69,6 +70,7 @@ type Provider struct {
 	authURL     string
 	tokenURL    string
 	userInfoURL string
+	logoutURL   string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -82,11 +84,12 @@ type cachedKeys struct {
 }
 
 type providerJSON struct {
-	Issuer      string `json:"issuer"`
-	AuthURL     string `json:"authorization_endpoint"`
-	TokenURL    string `json:"token_endpoint"`
-	JWKSURL     string `json:"jwks_uri"`
-	UserInfoURL string `json:"userinfo_endpoint"`
+	Issuer        string `json:"issuer"`
+	AuthURL       string `json:"authorization_endpoint"`
+	TokenURL      string `json:"token_endpoint"`
+	JWKSURL       string `json:"jwks_uri"`
+	UserInfoURL   string `json:"userinfo_endpoint"`
+	EndSessionURL string `json:"end_session_endpoint"`
 }
 
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
@@ -128,6 +131,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		authURL:      p.AuthURL,
 		tokenURL:     p.TokenURL,
 		userInfoURL:  p.UserInfoURL,
+		logoutURL:    p.EndSessionURL,
 		rawClaims:    body,
 		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
 	}, nil
@@ -156,6 +160,27 @@ func (p *Provider) Claims(v interface{}) error {
 // Endpoint returns the OAuth2 auth and token endpoints for the given provider.
 func (p *Provider) Endpoint() oauth2.Endpoint {
 	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL}
+}
+
+// LogoutEndpoint returns the logout endpoints for the given provider.
+// See: https://openid.net/specs/openid-connect-session-1_0.html#RPLogout
+func (p *Provider) LogoutURL(idTokenHint string, redirectURL string, state string) string {
+	logoutURL, err := url.Parse(p.logoutURL)
+	if err != nil {
+		return ""
+	}
+	query := logoutURL.Query()
+	if idTokenHint != "" {
+		query.Set("id_token_hint", idTokenHint)
+	}
+	if redirectURL != "" {
+		query.Set("post_logout_redirect_uri", redirectURL)
+	}
+	if state != "" {
+		query.Set("state", state)
+	}
+	logoutURL.RawQuery = query.Encode()
+	return logoutURL.String()
 }
 
 // UserInfo represents the OpenID Connect userinfo claims.
