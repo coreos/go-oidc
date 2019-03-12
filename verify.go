@@ -237,7 +237,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		// for Google.
 		//
 		// We will not add hooks to let other providers go off spec like this.
-		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
+		if !(v.issuer == issuerGoogleAccounts || t.Issuer == issuerGoogleAccountsNoScheme) {
 			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
 		}
 	}
