@@ -86,6 +86,8 @@ type Config struct {
 	SkipClientIDCheck bool
 	// If true, token expiry is not checked.
 	SkipExpiryCheck bool
+	// If true, no Issuer check performed.
+	SkipIssuerCheck bool
 
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
@@ -231,7 +233,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	}
 
 	// Check issuer.
-	if t.Issuer != v.issuer {
+	if !v.config.SkipIssuerCheck && t.Issuer != v.issuer {
 		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
 		// the required "https://accounts.google.com". Detect this case and allow it only
 		// for Google.
