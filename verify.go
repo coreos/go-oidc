@@ -87,6 +87,8 @@ type Config struct {
 	// If true, token expiry is not checked.
 	SkipExpiryCheck bool
 
+	IssuerChecker func(issuer string) bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 }
@@ -232,13 +234,21 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	// Check issuer.
 	if t.Issuer != v.issuer {
-		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
-		// the required "https://accounts.google.com". Detect this case and allow it only
-		// for Google.
-		//
-		// We will not add hooks to let other providers go off spec like this.
-		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
-			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+		// something like firebase need a custom checker
+		// https://firebase.google.com/docs/auth/admin/verify-id-tokens#verify_id_tokens_using_a_third-party_jwt_library
+		if v.config.IssuerChecker != nil {
+			if !v.config.IssuerChecker(t.Issuer) {
+				return nil, fmt.Errorf("oidc: invalidate id token got %q", t.Issuer)
+			}
+		} else {
+			// Google sometimes returns "accounts.google.com" as the issuer claim instead of
+			// the required "https://accounts.google.com". Detect this case and allow it only
+			// for Google.
+			//
+			// We will not add hooks to let other providers go off spec like this.
+			if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
+				return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+			}
 		}
 	}
 
