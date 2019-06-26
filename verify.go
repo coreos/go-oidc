@@ -87,6 +87,15 @@ type Config struct {
 	// If true, token expiry is not checked.
 	SkipExpiryCheck bool
 
+	// SkipIssuerCheck is intended for specialized cases where the the caller wishes to
+	// defer issuer validation. When enabled, callers MUST independently verify the Token's
+	// Issuer is a known good value.
+	//
+	// Mismatched issuers often indicate client mis-configuration. If mismatches are
+	// unexpected, evaluate if the provided issuer URL is incorrect instead of enabling
+	// this option.
+	SkipIssuerCheck bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 }
@@ -231,7 +240,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	}
 
 	// Check issuer.
-	if t.Issuer != v.issuer {
+	if !v.config.SkipIssuerCheck && t.Issuer != v.issuer {
 		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
 		// the required "https://accounts.google.com". Detect this case and allow it only
 		// for Google.
