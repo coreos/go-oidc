@@ -176,8 +176,23 @@ func (u *UserInfo) Claims(v interface{}) error {
 	return json.Unmarshal(u.claims, v)
 }
 
-// UserInfo uses the token source to query the provider's user info endpoint.
+// UserInfo uses the token source to query the provider's user info endpoint and returns a UserInfo.
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource) (*UserInfo, error) {
+	body, err := p.UserInfoRaw(ctx, tokenSource)
+	if err != nil {
+		return nil, err
+	}
+
+	var userInfo UserInfo
+	if err := json.Unmarshal(body, &userInfo); err != nil {
+		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
+	}
+	userInfo.claims = body
+	return &userInfo, nil
+}
+
+// UserInfoRaw uses the token source to query the provider's user info endpoint to return the raw response.
+func (p *Provider) UserInfoRaw(ctx context.Context, tokenSource oauth2.TokenSource) ([]byte, error) {
 	if p.userInfoURL == "" {
 		return nil, errors.New("oidc: user info endpoint is not supported by this provider")
 	}
@@ -205,13 +220,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s: %s", resp.Status, body)
 	}
-
-	var userInfo UserInfo
-	if err := json.Unmarshal(body, &userInfo); err != nil {
-		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
-	}
-	userInfo.claims = body
-	return &userInfo, nil
+	return body, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
