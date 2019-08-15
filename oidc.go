@@ -321,6 +321,7 @@ type idToken struct {
 	Audience     audience               `json:"aud"`
 	Expiry       jsonTime               `json:"exp"`
 	IssuedAt     jsonTime               `json:"iat"`
+	NotBefore    *jsonTime              `json:"nbf"`
 	Nonce        string                 `json:"nonce"`
 	AtHash       string                 `json:"at_hash"`
 	ClaimNames   map[string]string      `json:"_claim_names"`

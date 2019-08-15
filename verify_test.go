@@ -107,6 +107,34 @@ func TestVerify(t *testing.T) {
 			},
 			signKey: newRSAKey(t),
 		},
+		{
+			name: "nbf in future",
+			idToken: `{"iss":"https://foo","nbf":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) +
+				`,"exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
+			config: Config{
+				SkipClientIDCheck: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name: "nbf in past",
+			idToken: `{"iss":"https://foo","nbf":` + strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) +
+				`,"exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
+			config: Config{
+				SkipClientIDCheck: true,
+			},
+			signKey: newRSAKey(t),
+		},
+		{
+			name: "nbf in future within clock skew tolerance",
+			idToken: `{"iss":"https://foo","nbf":` + strconv.FormatInt(time.Now().Add(30*time.Second).Unix(), 10) +
+				`,"exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
+			config: Config{
+				SkipClientIDCheck: true,
+			},
+			signKey: newRSAKey(t),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)

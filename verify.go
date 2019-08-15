@@ -270,9 +270,20 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		if v.config.Now != nil {
 			now = v.config.Now
 		}
+		nowTime := now()
 
-		if t.Expiry.Before(now()) {
+		if t.Expiry.Before(nowTime) {
 			return nil, fmt.Errorf("oidc: token is expired (Token Expiry: %v)", t.Expiry)
+		}
+
+		// If nbf claim is provided in token, ensure that it is indeed in the past.
+		if token.NotBefore != nil {
+			nbfTime := time.Time(*token.NotBefore)
+			leeway := 1 * time.Minute
+
+			if nowTime.Add(leeway).Before(nbfTime) {
+				return nil, fmt.Errorf("oidc: current time %v before the nbf (not before) time: %v", nowTime, nbfTime)
+			}
 		}
 	}
 
