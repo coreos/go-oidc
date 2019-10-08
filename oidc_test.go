@@ -93,3 +93,38 @@ func TestAccessTokenVerification(t *testing.T) {
 		t.Run(test.name, test.run)
 	}
 }
+
+func TestGetWellKnown(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			"noSlash",
+			"https://example.com",
+			"https://example.com/.well-known/openid-configuration",
+		},
+		{
+			"withSlash",
+			"https://example.com/",
+			"https://example.com/.well-known/openid-configuration",
+		},
+		{
+			"withQueryParams",
+			"https://example.com/v2.0?p=val",
+			"https://example.com/v2.0/.well-known/openid-configuration?p=val",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := getWellKnown(test.in)
+			if err != nil {
+				t.Fatalf("want nil error, got %v", err)
+			}
+			if got != test.want {
+				t.Fatalf("getWellKnown(%q) = %q; want %q", test.in, got, test.want)
+			}
+		})
+	}
+}

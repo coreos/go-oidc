@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,6 +64,17 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	return client.Do(req.WithContext(ctx))
 }
 
+func getWellKnown(issuer string) (string, error) {
+	// Some OpenID issuers (e.g. Azure Active Directory B2C) have a query parameter as part of the
+	// configuration. Simply adding to the end of the URL will not work with these providers.
+	u, err := url.Parse(issuer)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse issuer URL: %v", err)
+	}
+	u.Path = strings.TrimSuffix(u.Path, "/") + "/.well-known/openid-configuration"
+	return u.String(), nil
+}
+
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
 	issuer      string
@@ -94,7 +106,10 @@ type providerJSON struct {
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
-	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
+	wellKnown, err := getWellKnown(issuer)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("GET", wellKnown, nil)
 	if err != nil {
 		return nil, err
