@@ -33,6 +33,10 @@ const (
 	//
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess
 	ScopeOfflineAccess = "offline_access"
+
+	// defaultKeyFetchTimeout specifies the default timeout for background requests for
+	// fetching new keys from the remote server.
+	defaultKeyFetchTimeout = 30 * time.Second
 )
 
 var (
@@ -110,6 +114,10 @@ var supportedAlgorithms = map[string]bool{
 //
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
+//
+// If a custom HTTP client was configured for ctx via the ContextClient function, this client
+// will also be used for fetching new remote keys in the background. The expiration of ctx
+// does not have any observable effect after this function returns.
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	req, err := http.NewRequest("GET", wellKnown, nil)
@@ -146,6 +154,15 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 			algs = append(algs, a)
 		}
 	}
+
+	clientForKeySet := *http.DefaultClient
+	if ctxClient, _ := ctx.Value(oauth2.HTTPClient).(*http.Client); ctxClient != nil {
+		clientForKeySet = *ctxClient
+	}
+	if clientForKeySet.Timeout == 0 {
+		clientForKeySet.Timeout = defaultKeyFetchTimeout
+	}
+
 	return &Provider{
 		issuer:       p.Issuer,
 		authURL:      p.AuthURL,
@@ -153,7 +170,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		userInfoURL:  p.UserInfoURL,
 		algorithms:   algs,
 		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		remoteKeySet: NewRemoteKeySetWithClient(&clientForKeySet, p.JWKSURL),
 	}, nil
 }
 

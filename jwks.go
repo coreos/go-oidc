@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pquerna/cachecontrol"
+	"golang.org/x/oauth2"
 	jose "gopkg.in/square/go-jose.v2"
 )
 
@@ -23,6 +24,21 @@ import (
 // updated.
 const keysExpiryDelta = 30 * time.Second
 
+// NewRemoteKeySetWithClient returns a KeySet that can validate JSON web tokens by using
+// GETs to fetch JSON web token sets hosted at a remote URL. This is automatically
+// used by NewProvider using the URLs returned by OpenID Connect discovery, but is
+// exposed for providers that don't support discovery or to prevent round trips to the
+// discovery URL.
+//
+// The returned KeySet is a long lived verifier that caches keys based on cache-control
+// headers. Reuse a common remote key set instead of creating new ones as needed.
+//
+// The client parameter controls the behavior of the fetch requests, such as the request
+// timeout. A value of nil causes http.DefaultClient to be used.
+func NewRemoteKeySetWithClient(client *http.Client, jwksURL string) KeySet {
+	return newRemoteKeySet(context.Background(), client, jwksURL, time.Now)
+}
+
 // NewRemoteKeySet returns a KeySet that can validate JSON web tokens by using HTTP
 // GETs to fetch JSON web token sets hosted at a remote URL. This is automatically
 // used by NewProvider using the URLs returned by OpenID Connect discovery, but is
@@ -33,20 +49,29 @@ const keysExpiryDelta = 30 * time.Second
 // headers. Reuse a common remote key set instead of creating new ones as needed.
 //
 // The behavior of the returned KeySet is undefined once the context is canceled.
+//
+// Deprecated: Retaining references to contexts past the return of a function can be
+// confusing. Use NewRemoteKeySetWithClient to use custom client behavior and configure
+// a timeout for key fetches.
 func NewRemoteKeySet(ctx context.Context, jwksURL string) KeySet {
-	return newRemoteKeySet(ctx, jwksURL, time.Now)
+	ctxClient, _ := ctx.Value(oauth2.HTTPClient).(*http.Client)
+	return newRemoteKeySet(ctx, ctxClient, jwksURL, time.Now)
 }
 
-func newRemoteKeySet(ctx context.Context, jwksURL string, now func() time.Time) *remoteKeySet {
+func newRemoteKeySet(ctx context.Context, client *http.Client, jwksURL string, now func() time.Time) *remoteKeySet {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	if now == nil {
 		now = time.Now
 	}
-	return &remoteKeySet{jwksURL: jwksURL, ctx: ctx, now: now}
+	return &remoteKeySet{jwksURL: jwksURL, ctx: ctx, client: client, now: now}
 }
 
 type remoteKeySet struct {
 	jwksURL string
 	ctx     context.Context
+	client  *http.Client
 	now     func() time.Time
 
 	// guard all other fields
@@ -190,12 +215,12 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 }
 
 func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
-	req, err := http.NewRequest("GET", r.jwksURL, nil)
+	req, err := http.NewRequest(http.MethodGet, r.jwksURL, nil)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: can't create request: %v", err)
 	}
 
-	resp, err := doRequest(r.ctx, req)
+	resp, err := r.client.Do(req.WithContext(r.ctx))
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: get keys failed %v", err)
 	}
