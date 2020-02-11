@@ -227,11 +227,11 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	//step through the token to map claim names to claim sources"
 	for cn, src := range token.ClaimNames {
 		if src == "" {
-			return nil, fmt.Errorf("oidc: failed to obtain source from claim name")
+			return nil, errors.New("oidc: failed to obtain source from claim name")
 		}
 		s, ok := token.ClaimSources[src]
 		if !ok {
-			return nil, fmt.Errorf("oidc: source does not exist")
+			return nil, errors.New("oidc: source does not exist")
 		}
 		distributedClaims[cn] = s
 	}
@@ -269,7 +269,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
 			}
 		} else {
-			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")
+			return nil, errors.New("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")
 		}
 	}
 
@@ -298,10 +298,10 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	switch len(jws.Signatures) {
 	case 0:
-		return nil, fmt.Errorf("oidc: id token not signed")
+		return nil, errors.New("oidc: id token not signed")
 	case 1:
 	default:
-		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
+		return nil, errors.New("oidc: multiple signatures on id token not supported")
 	}
 
 	sig := jws.Signatures[0]

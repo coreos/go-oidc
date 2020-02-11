@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,7 +50,7 @@ func TestAccessTokenVerification(t *testing.T) {
 	assertMsg := func(msg string) func(err error) error {
 		return func(err error) error {
 			if err == nil {
-				return fmt.Errorf("expected error, got success")
+				return errors.New("expected error, got success")
 			}
 			if err.Error() != msg {
 				return fmt.Errorf("bad error message, %q, (want %q)", err.Error(), msg)
