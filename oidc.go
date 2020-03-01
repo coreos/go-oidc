@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -65,11 +66,12 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer      string
-	authURL     string
-	tokenURL    string
-	userInfoURL string
-	algorithms  []string
+	issuer        string
+	authURL       string
+	tokenURL      string
+	endSessionURL string
+	userInfoURL   string
+	algorithms    []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -83,12 +85,13 @@ type cachedKeys struct {
 }
 
 type providerJSON struct {
-	Issuer      string   `json:"issuer"`
-	AuthURL     string   `json:"authorization_endpoint"`
-	TokenURL    string   `json:"token_endpoint"`
-	JWKSURL     string   `json:"jwks_uri"`
-	UserInfoURL string   `json:"userinfo_endpoint"`
-	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
+	Issuer        string   `json:"issuer"`
+	AuthURL       string   `json:"authorization_endpoint"`
+	TokenURL      string   `json:"token_endpoint"`
+	EndSessionURL string   `json:"end_session_endpoint"`
+	JWKSURL       string   `json:"jwks_uri"`
+	UserInfoURL   string   `json:"userinfo_endpoint"`
+	Algorithms    []string `json:"id_token_signing_alg_values_supported"`
 }
 
 // supportedAlgorithms is a list of algorithms explicitly supported by this
@@ -147,13 +150,14 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		}
 	}
 	return &Provider{
-		issuer:       p.Issuer,
-		authURL:      p.AuthURL,
-		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
-		algorithms:   algs,
-		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		issuer:        p.Issuer,
+		authURL:       p.AuthURL,
+		tokenURL:      p.TokenURL,
+		endSessionURL: p.EndSessionURL,
+		userInfoURL:   p.UserInfoURL,
+		algorithms:    algs,
+		rawClaims:     body,
+		remoteKeySet:  NewRemoteKeySet(ctx, p.JWKSURL),
 	}, nil
 }
 
@@ -236,6 +240,73 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	}
 	userInfo.claims = body
 	return &userInfo, nil
+}
+
+// EndSessionOptions is optional parameters for the Initiated Logout by https://openid.net/specs/openid-connect-session-1_0.html#RPLogout
+type EndSessionOptions struct {
+	IDTokenHint string
+	RedirectURL string
+	State       string
+}
+
+// EndSession uses the token source to query the provider's end session endpoint.
+func (p *Provider) EndSession(ctx context.Context, tokenSource oauth2.TokenSource, options EndSessionOptions) error {
+	endSessionURL, err := makeEndSessionEndpoint(p.endSessionURL, options)
+	if err != nil {
+		return fmt.Errorf("oidc: error of make an end session url: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, endSessionURL, nil)
+	if err != nil {
+		return fmt.Errorf("oidc: create GET request: %v", err)
+	}
+
+	token, err := tokenSource.Token()
+	if err != nil {
+		return fmt.Errorf("oidc: get access token: %v", err)
+	}
+
+	token.SetAuthHeader(req)
+
+	resp, err := doRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s: %s", resp.Status, body)
+	}
+
+	return nil
+}
+
+func makeEndSessionEndpoint(endSessionURL string, options EndSessionOptions) (endURL string, err error) {
+	if endSessionURL == "" {
+		return "", errors.New("oidc: end session endpoint is not supported by this provider")
+	}
+
+	parsedEndSessionURL, err := url.Parse(endSessionURL)
+	if err != nil {
+		return "", fmt.Errorf("oidc: wrong format of end session endpoint: %s", endSessionURL)
+	}
+
+	if options.IDTokenHint != "" {
+		parsedEndSessionURL.Query().Set("id_token_hint", options.IDTokenHint)
+	}
+	if options.RedirectURL != "" {
+		parsedEndSessionURL.Query().Set("post_logout_redirect_uri", options.RedirectURL)
+	}
+	if options.State != "" {
+		parsedEndSessionURL.Query().Set("state", options.State)
+	}
+
+	parsedEndSessionURL.RawQuery = parsedEndSessionURL.Query().Encode()
+
+	return parsedEndSessionURL.String(), nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
