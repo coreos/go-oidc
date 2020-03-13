@@ -257,7 +257,7 @@ func TestNewProvider(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				io.WriteString(w, strings.ReplaceAll(test.data, "ISSUER", issuer))
+				io.WriteString(w, strings.ReplaceAll(test.data, "ISSUER", strings.TrimSuffix(issuer, "/")))
 			}
 			s := httptest.NewServer(http.HandlerFunc(hf))
 			defer s.Close()
