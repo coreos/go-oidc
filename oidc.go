@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -198,6 +199,25 @@ func (u *UserInfo) Claims(v interface{}) error {
 		return errors.New("oidc: claims not set")
 	}
 	return json.Unmarshal(u.claims, v)
+}
+
+// UnmarshalJSON unmarshals the given data into the user info struct.
+func (u *UserInfo) UnmarshalJSON(data []byte) error {
+	// AWS Cognito, and perhaps other providers, returns the email_verified field as a string,
+	// so we wrap the struct and store it as an interface, then use strconv to convert it to a
+	// bool in the final struct
+	type UserInfoAlias UserInfo
+	var alias struct {
+		UserInfoAlias
+		EmailVerified interface{} `json:"email_verified"`
+	}
+	err := json.Unmarshal(data, &alias)
+	if err != nil {
+		return err
+	}
+	*u = UserInfo(alias.UserInfoAlias)
+	u.EmailVerified, _ = strconv.ParseBool(fmt.Sprint(alias.EmailVerified))
+	return nil
 }
 
 // UserInfo uses the token source to query the provider's user info endpoint.

@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -295,5 +296,16 @@ func TestNewProvider(t *testing.T) {
 					p.algorithms, test.wantAlgorithms)
 			}
 		})
+	}
+}
+
+func TestStringEmailVerified(t *testing.T) {
+	var u UserInfo
+	err := json.Unmarshal([]byte(`{ "email_verified": "true" }`), &u)
+	if err != nil {
+		t.Error(err)
+	}
+	if !u.EmailVerified {
+		t.Error("expected email_verified to be parsed in json")
 	}
 }
