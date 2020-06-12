@@ -1,4 +1,4 @@
-module github.com/coreos/go-oidc
+module github.com/coreos/go-oidc/v3
 
 go 1.14
 
