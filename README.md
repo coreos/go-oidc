@@ -1,7 +1,7 @@
 # go-oidc
 
-[![GoDoc](https://godoc.org/github.com/coreos/go-oidc?status.svg)](https://godoc.org/github.com/coreos/go-oidc)
-[![Build Status](https://travis-ci.org/coreos/go-oidc.png?branch=master)](https://travis-ci.org/coreos/go-oidc)
+[![GoDoc](https://godoc.org/github.com/coreos/go-oidc?status.svg)](https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc)
+![github.com/coreos/go-oidc/v3](https://github.com/coreos/go-oidc/workflows/test/badge.svg?branch=v3)
 
 ## OpenID Connect support for Go
 
