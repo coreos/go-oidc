@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -296,4 +298,130 @@ func TestNewProvider(t *testing.T) {
 			}
 		})
 	}
+}
+
+type testServer struct {
+	contentType string
+	userInfo    string
+}
+
+func (ts *testServer) run(t *testing.T) string {
+	newMux := http.NewServeMux()
+	server := httptest.NewServer(newMux)
+
+	// generated using mkjwk.org
+	jwks := `{
+		"keys": [
+			{
+				"kty": "RSA",
+				"e": "AQAB",
+				"use": "sig",
+				"kid": "test",
+				"alg": "RS256",
+				"n": "luTpO0eGNYC36udr3gvoBxTjF1RxHXBMRcEdY13E_IocCM5GuqFNLbScH3q69O6WSq8a43cVmsdnayw3oHu8GDTZuggnsPG28Ln4FFWehdV306YBPBgS_6C8x6mX9PipoNnIpG2PAGhqw1iL_V0WmmNqdJPl9EirgbbHJh7GIkMxyj9UZiwi19YSFHhDdyJvux1L6hieqjrsFFJdwxk1QOlp9NkkCcVNZarUqUltb5JH82IiMSXYsDeOjjE7DlrFLqdo-zg8QlOtY8pow6gueweMWyY4iVv5IAziOh7128aid0-48-mNLTdZtAG758rtuKHJg9dq0nfOm64qROCNUQ"
+			}
+		]
+	}`
+
+	wellKnown := fmt.Sprintf(`{
+		"issuer": "%[1]s",
+		"authorization_endpoint": "%[1]s/auth",
+		"token_endpoint": "%[1]s/token",
+		"jwks_uri": "%[1]s/keys",
+		"userinfo_endpoint": "%[1]s/userinfo",
+		"id_token_signing_alg_values_supported": ["RS256"]
+	}`, server.URL)
+
+	newMux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, req *http.Request) {
+		_, err := io.WriteString(w, wellKnown)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+	})
+	newMux.HandleFunc("/keys", func(w http.ResponseWriter, req *http.Request) {
+		_, err := io.WriteString(w, jwks)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+	})
+	newMux.HandleFunc("/userinfo", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Add("Content-Type", ts.contentType)
+		_, err := io.WriteString(w, ts.userInfo)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+	})
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+func TestUserInfoEndpoint(t *testing.T) {
+
+	userInfoJson := `{
+		"sub": "1234567890",
+		"profile": "Joe Doe",
+		"email": "joe@doe.com",
+		"email_verified": true,
+		"is_admin": true
+	}`
+
+	tests := []struct {
+		name         string
+		server       testServer
+		wantUserInfo UserInfo
+	}{
+		{
+			name: "basic json userinfo",
+			server: testServer{
+				contentType: "application/json",
+				userInfo:    userInfoJson,
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJson),
+			},
+		},
+		{
+			name: "signed jwt userinfo",
+			server: testServer{
+				contentType: "application/jwt",
+				// generated with jwt.io based on the private/public key pair
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.AP9Y8Md1rjPfuFPTw7hI6kREQe1J0Wb2P5SeVnu_dmAFAyYbG8nbu2Xveb4HOY9wMZbU7UAuSrlvvF_duImlIWei_Ym0ZVrFDATYoMI_MNKwmt4-vM_pm-97zghuPfpXTLYenHgeyPTkHv_SEwhiKzg0Ap7kC3PlAOGeElMO1L1thDZdMd1MqClOEzie00fZwbUGXwkUdDV0_vd173GBACniEQF_9qtgDyxNzh9IMYPNVdRk0bqzBCdQuhTE1AQmWebTrri962uHdWex25KEk_sxOsSW5HIDc0vEF8uBBPUJjaHDPTvwzMh0RuqwT_SqwJvyOHhG0jSz-LYEa5eugQ",
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJson),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			serverURL := test.server.run(t)
+
+			ctx := context.Background()
+
+			provider, err := NewProvider(ctx, serverURL)
+			if err != nil {
+				t.Fatalf("Failed to initialize provider for test %v", err)
+			}
+
+			fakeOauthToken := oauth2.Token{}
+			info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(&fakeOauthToken))
+			if err != nil {
+				t.Fatalf("failed to get userinfo %v", err)
+			}
+
+			if info.Email != test.wantUserInfo.Email {
+				t.Errorf("expected UserInfo to be %v , got %v", test.wantUserInfo, info)
+			}
+		})
+	}
+
 }
