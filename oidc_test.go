@@ -357,7 +357,7 @@ func (ts *testServer) run(t *testing.T) string {
 
 func TestUserInfoEndpoint(t *testing.T) {
 
-	userInfoJson := `{
+	userInfoJSON := `{
 		"sub": "1234567890",
 		"profile": "Joe Doe",
 		"email": "joe@doe.com",
@@ -374,14 +374,14 @@ func TestUserInfoEndpoint(t *testing.T) {
 			name: "basic json userinfo",
 			server: testServer{
 				contentType: "application/json",
-				userInfo:    userInfoJson,
+				userInfo:    userInfoJSON,
 			},
 			wantUserInfo: UserInfo{
 				Subject:       "1234567890",
 				Profile:       "Joe Doe",
 				Email:         "joe@doe.com",
 				EmailVerified: true,
-				claims:        []byte(userInfoJson),
+				claims:        []byte(userInfoJSON),
 			},
 		},
 		{
@@ -396,7 +396,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 				Profile:       "Joe Doe",
 				Email:         "joe@doe.com",
 				EmailVerified: true,
-				claims:        []byte(userInfoJson),
+				claims:        []byte(userInfoJSON),
 			},
 		},
 	}
