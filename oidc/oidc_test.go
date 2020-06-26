@@ -412,6 +412,21 @@ func TestUserInfoEndpoint(t *testing.T) {
 				claims:        []byte(userInfoJSON),
 			},
 		},
+		{
+			name: "signed jwt userinfo, content-type with charset",
+			server: testServer{
+				contentType: "application/jwt; charset=ISO-8859-1",
+				// generated with jwt.io based on the private/public key pair
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.AP9Y8Md1rjPfuFPTw7hI6kREQe1J0Wb2P5SeVnu_dmAFAyYbG8nbu2Xveb4HOY9wMZbU7UAuSrlvvF_duImlIWei_Ym0ZVrFDATYoMI_MNKwmt4-vM_pm-97zghuPfpXTLYenHgeyPTkHv_SEwhiKzg0Ap7kC3PlAOGeElMO1L1thDZdMd1MqClOEzie00fZwbUGXwkUdDV0_vd173GBACniEQF_9qtgDyxNzh9IMYPNVdRk0bqzBCdQuhTE1AQmWebTrri962uHdWex25KEk_sxOsSW5HIDc0vEF8uBBPUJjaHDPTvwzMh0RuqwT_SqwJvyOHhG0jSz-LYEa5eugQ",
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJson),
+			},
+		},
 	}
 
 	for _, test := range tests {
