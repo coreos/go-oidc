@@ -55,6 +55,17 @@ func ClientContext(ctx context.Context, client *http.Client) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
 }
 
+// cloneContext copies a context's bag-of-values into a new context that isn't
+// associated with its cancelation. This is used to initialize remote keys sets
+// which run in the background and aren't associated with the initial context.
+func cloneContext(ctx context.Context) context.Context {
+	cp := context.Background()
+	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
+		cp = ClientContext(cp, c)
+	}
+	return cp
+}
+
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	client := http.DefaultClient
 	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
@@ -153,7 +164,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		userInfoURL:  p.UserInfoURL,
 		algorithms:   algs,
 		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
 	}, nil
 }
 
