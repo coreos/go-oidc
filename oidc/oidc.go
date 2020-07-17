@@ -230,6 +230,14 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		return nil, fmt.Errorf("%s: %s", resp.Status, body)
 	}
 
+	if strings.EqualFold(resp.Header.Get("Content-Type"), "application/jwt") {
+		payload, err := p.remoteKeySet.VerifySignature(ctx, string(body))
+		if err != nil {
+			return nil, fmt.Errorf("oidc: invalid userinfo jwt signature %v", err)
+		}
+		body = payload
+	}
+
 	var userInfo UserInfo
 	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
