@@ -172,7 +172,7 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 	}
 }
 
-func TestCacheControl(t *testing.T) {
+func TestRotation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -223,23 +223,12 @@ func TestCacheControl(t *testing.T) {
 	if _, err := rks.verify(ctx, jws1); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
 	}
-	if _, err := rks.verify(ctx, jws2); err == nil {
-		t.Errorf("incorrectly verified signature, still within cache limit")
-	}
-
-	// Move time forward. Remote key set should not query the remote server.
-	now = now.Add(time.Duration(cacheForSeconds) * time.Second)
-
-	if _, err := rks.verify(ctx, jws1); err != nil {
-		t.Errorf("failed to verify valid signature: %v", err)
-	}
 	if _, err := rks.verify(ctx, jws2); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
 	}
 
-	// Kill server and move time forward again. Keys should still verify.
+	// Kill server. Keys should still be cached.
 	s.Close()
-	now = now.Add(time.Duration(cacheForSeconds) * time.Second)
 
 	if _, err := rks.verify(ctx, jws1); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
