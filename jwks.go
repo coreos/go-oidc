@@ -9,19 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pquerna/cachecontrol"
 	jose "gopkg.in/square/go-jose.v2"
 )
-
-// keysExpiryDelta is the allowed clock skew between a client and the OpenID Connect
-// server.
-//
-// When keys expire, they are valid for this amount of time after.
-//
-// If the keys have not expired, and an ID Token claims it was signed by a key not in
-// the cache, if and only if the keys expire in this amount of time, the keys will be
-// updated.
-const keysExpiryDelta = 30 * time.Second
 
 // NewRemoteKeySet returns a KeySet that can validate JSON web tokens by using HTTP
 // GETs to fetch JSON web token sets hosted at a remote URL. This is automatically
@@ -56,9 +45,8 @@ type remoteKeySet struct {
 	// multiple goroutines to wait for its result.
 	inflight *inflight
 
-	// A set of cached keys and their expiry.
+	// A set of cached keys.
 	cachedKeys []jose.JSONWebKey
-	expiry     time.Time
 }
 
 // inflight is used to wait on some in-flight request from multiple goroutines.
@@ -109,9 +97,7 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 		break
 	}
 
-	keys, expiry := r.keysFromCache()
-
-	// Don't check expiry yet. This optimizes for when the provider is unavailable.
+	keys := r.keysFromCache()
 	for _, key := range keys {
 		if keyID == "" || key.KeyID == keyID {
 			if payload, err := jws.Verify(&key); err == nil {
@@ -120,11 +106,10 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 		}
 	}
 
-	if !r.now().Add(keysExpiryDelta).After(expiry) {
-		// Keys haven't expired, don't refresh.
-		return nil, errors.New("failed to verify id token signature")
-	}
-
+	// If the kid doesn't match, check for new keys from the remote. This is the
+	// strategy recommended by the spec.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#RotateSigKeys
 	keys, err := r.keysFromRemote(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching keys %v", err)
@@ -140,10 +125,10 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 	return nil, errors.New("failed to verify id token signature")
 }
 
-func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey, expiry time.Time) {
+func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.cachedKeys, r.expiry
+	return r.cachedKeys
 }
 
 // keysFromRemote syncs the key set from the remote set, records the values in the
@@ -160,7 +145,7 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 		// once the goroutine is done.
 		go func() {
 			// Sync keys and finish inflight when that's done.
-			keys, expiry, err := r.updateKeys()
+			keys, err := r.updateKeys()
 
 			r.inflight.done(keys, err)
 
@@ -171,7 +156,6 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 
 			if err == nil {
 				r.cachedKeys = keys
-				r.expiry = expiry
 			}
 
 			// Free inflight so a different request can run.
@@ -189,40 +173,31 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 	}
 }
 
-func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
+func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("oidc: can't create request: %v", err)
+		return nil, fmt.Errorf("oidc: can't create request: %v", err)
 	}
 
 	resp, err := doRequest(r.ctx, req)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("oidc: get keys failed %v", err)
+		return nil, fmt.Errorf("oidc: get keys failed %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to read response body: %v", err)
+		return nil, fmt.Errorf("unable to read response body: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, time.Time{}, fmt.Errorf("oidc: get keys failed: %s %s", resp.Status, body)
+		return nil, fmt.Errorf("oidc: get keys failed: %s %s", resp.Status, body)
 	}
 
 	var keySet jose.JSONWebKeySet
 	err = unmarshalResp(resp, body, &keySet)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("oidc: failed to decode keys: %v %s", err, body)
+		return nil, fmt.Errorf("oidc: failed to decode keys: %v %s", err, body)
 	}
-
-	// If the server doesn't provide cache control headers, assume the
-	// keys expire immediately.
-	expiry := r.now()
-
-	_, e, err := cachecontrol.CachableResponse(req, resp, cachecontrol.Options{})
-	if err == nil && e.After(expiry) {
-		expiry = e
-	}
-	return keySet.Keys, expiry, nil
+	return keySet.Keys, nil
 }
