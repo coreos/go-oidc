@@ -20,20 +20,20 @@ import (
 //
 // The returned KeySet is a long lived verifier that caches keys based on cache-control
 // headers. Reuse a common remote key set instead of creating new ones as needed.
-//
-// The behavior of the returned KeySet is undefined once the context is canceled.
-func NewRemoteKeySet(ctx context.Context, jwksURL string) KeySet {
+func NewRemoteKeySet(ctx context.Context, jwksURL string) *RemoteKeySet {
 	return newRemoteKeySet(ctx, jwksURL, time.Now)
 }
 
-func newRemoteKeySet(ctx context.Context, jwksURL string, now func() time.Time) *remoteKeySet {
+func newRemoteKeySet(ctx context.Context, jwksURL string, now func() time.Time) *RemoteKeySet {
 	if now == nil {
 		now = time.Now
 	}
-	return &remoteKeySet{jwksURL: jwksURL, ctx: ctx, now: now}
+	return &RemoteKeySet{jwksURL: jwksURL, ctx: cloneContext(ctx), now: now}
 }
 
-type remoteKeySet struct {
+// RemoteKeySet is a KeySet implementation that validates JSON web tokens against
+// a jwks_uri endpoint.
+type RemoteKeySet struct {
 	jwksURL string
 	ctx     context.Context
 	now     func() time.Time
@@ -81,7 +81,12 @@ func (i *inflight) result() ([]jose.JSONWebKey, error) {
 	return i.keys, i.err
 }
 
-func (r *remoteKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
+// VerifySignature validates a payload against a signature from the jwks_uri.
+//
+// Users MUST NOT call this method directly and should use an IDTokenVerifier
+// instead. This method skips critical validations such as 'alg' values and is
+// only exported to implement the KeySet interface.
+func (r *RemoteKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
 	jws, err := jose.ParseSigned(jwt)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
@@ -89,7 +94,7 @@ func (r *remoteKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 	return r.verify(ctx, jws)
 }
 
-func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) ([]byte, error) {
+func (r *RemoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) ([]byte, error) {
 	// We don't support JWTs signed with multiple signatures.
 	keyID := ""
 	for _, sig := range jws.Signatures {
@@ -125,7 +130,7 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 	return nil, errors.New("failed to verify id token signature")
 }
 
-func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey) {
+func (r *RemoteKeySet) keysFromCache() (keys []jose.JSONWebKey) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.cachedKeys
@@ -133,7 +138,7 @@ func (r *remoteKeySet) keysFromCache() (keys []jose.JSONWebKey) {
 
 // keysFromRemote syncs the key set from the remote set, records the values in the
 // cache, and returns the key set.
-func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, error) {
+func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, error) {
 	// Need to lock to inspect the inflight request field.
 	r.mu.Lock()
 	// If there's not a current inflight request, create one.
@@ -173,7 +178,7 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 	}
 }
 
-func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
+func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: can't create request: %v", err)
