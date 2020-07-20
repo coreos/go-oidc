@@ -424,7 +424,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 				Profile:       "Joe Doe",
 				Email:         "joe@doe.com",
 				EmailVerified: true,
-				claims:        []byte(userInfoJson),
+				claims:        []byte(userInfoJSON),
 			},
 		},
 	}
