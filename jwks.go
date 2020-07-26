@@ -111,18 +111,33 @@ func (r *remoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 
 	keys, expiry := r.keysFromCache()
 
-	// Don't check expiry yet. This optimizes for when the provider is unavailable.
+	var goodpayload []byte
+
 	for _, key := range keys {
 		if keyID == "" || key.KeyID == keyID {
 			if payload, err := jws.Verify(&key); err == nil {
-				return payload, nil
+				goodpayload = payload
+				break
 			}
 		}
 	}
 
-	if !r.now().Add(keysExpiryDelta).After(expiry) {
-		// Keys haven't expired, don't refresh.
+	cacheIsExpired := r.now().Add(keysExpiryDelta).After(expiry)
+
+	// Keys haven't expired, don't refresh.
+	if goodpayload == nil && !cacheIsExpired {
 		return nil, errors.New("failed to verify id token signature")
+	}
+
+	// Attempt to refresh the cache, but don't make the current caller wait for their successful validation
+	if goodpayload != nil {
+		if cacheIsExpired {
+			go func() {
+				_, _ = r.keysFromRemote(context.Background())
+			}()
+		}
+
+		return goodpayload, nil
 	}
 
 	keys, err := r.keysFromRemote(ctx)
