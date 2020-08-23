@@ -331,7 +331,7 @@ func (ts *testServer) run(t *testing.T) string {
 				"use": "sig",
 				"kid": "test",
 				"alg": "RS256",
-				"n": "luTpO0eGNYC36udr3gvoBxTjF1RxHXBMRcEdY13E_IocCM5GuqFNLbScH3q69O6WSq8a43cVmsdnayw3oHu8GDTZuggnsPG28Ln4FFWehdV306YBPBgS_6C8x6mX9PipoNnIpG2PAGhqw1iL_V0WmmNqdJPl9EirgbbHJh7GIkMxyj9UZiwi19YSFHhDdyJvux1L6hieqjrsFFJdwxk1QOlp9NkkCcVNZarUqUltb5JH82IiMSXYsDeOjjE7DlrFLqdo-zg8QlOtY8pow6gueweMWyY4iVv5IAziOh7128aid0-48-mNLTdZtAG758rtuKHJg9dq0nfOm64qROCNUQ"
+				"n": "ilhCmTGFjjIPVN7Lfdn_fvpXOlzxa3eWnQGZ_eRa2ibFB1mnqoWxZJ8fkWIVFOQpsn66bIfWjBo_OI3sE6LhhRF8xhsMxlSeRKhpsWg0klYnMBeTWYET69YEAX_rGxy0MCZlFZ5tpr56EVZ-3QLfNiR4hcviqj9F2qE6jopfywsnlulJgyMi3N3kugit_JCNBJ0yz4ndZrMozVOtGqt35HhggUgYROzX6SWHUJdPXSmbAZU-SVLlesQhPfHS8LLq0sACb9OmdcwrpEFdbGCSTUPlHGkN5h6Zy8CS4s_bCdXKkjD20jv37M3GjRQkjE8vyMxFlo_qT8F8VZlSgXYTFw"
 			}
 		]
 	}`
@@ -377,6 +377,13 @@ func TestUserInfoEndpoint(t *testing.T) {
 		"email_verified": true,
 		"is_admin": true
 	}`
+	userInfoJSONCognitoVariant := `{
+		"sub": "1234567890",
+		"profile": "Joe Doe",
+		"email": "joe@doe.com",
+		"email_verified": "true",
+		"is_admin": true
+	}`
 
 	tests := []struct {
 		name         string
@@ -402,7 +409,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 			server: testServer{
 				contentType: "application/jwt",
 				// generated with jwt.io based on the private/public key pair
-				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.AP9Y8Md1rjPfuFPTw7hI6kREQe1J0Wb2P5SeVnu_dmAFAyYbG8nbu2Xveb4HOY9wMZbU7UAuSrlvvF_duImlIWei_Ym0ZVrFDATYoMI_MNKwmt4-vM_pm-97zghuPfpXTLYenHgeyPTkHv_SEwhiKzg0Ap7kC3PlAOGeElMO1L1thDZdMd1MqClOEzie00fZwbUGXwkUdDV0_vd173GBACniEQF_9qtgDyxNzh9IMYPNVdRk0bqzBCdQuhTE1AQmWebTrri962uHdWex25KEk_sxOsSW5HIDc0vEF8uBBPUJjaHDPTvwzMh0RuqwT_SqwJvyOHhG0jSz-LYEa5eugQ",
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.ejzc2IOLtvYp-2n5w3w4SW3rHNG9pOahnwpQCwuIaj7DvO4SxDIzeJmFPMKTJUc-1zi5T42mS4Gs2r18KWhSkk8kqYermRX0VcGEEsH0r2BG5boeza_EjCoJ5-jBPX5ODWGhu2sZIkZl29IbaVSC8jk8qKnqacchiHNmuv_xXjRsAgUsqYftrEQOxqhpfL5KN2qtgeVTczg3ABqs2-SFeEzcgA1TnA9H3AynCPCVUMFgh7xyS8jxx7DN-1vRHBySz5gNbf8z8MNx_XBLfRxxxMF24rDIE8Z2gf1DEAPr4tT38hD8ugKSE84gC3xHJWFWsRLg-Ll6OQqshs82axS00Q",
 			},
 			wantUserInfo: UserInfo{
 				Subject:       "1234567890",
@@ -417,7 +424,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 			server: testServer{
 				contentType: "application/jwt; charset=ISO-8859-1",
 				// generated with jwt.io based on the private/public key pair
-				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.AP9Y8Md1rjPfuFPTw7hI6kREQe1J0Wb2P5SeVnu_dmAFAyYbG8nbu2Xveb4HOY9wMZbU7UAuSrlvvF_duImlIWei_Ym0ZVrFDATYoMI_MNKwmt4-vM_pm-97zghuPfpXTLYenHgeyPTkHv_SEwhiKzg0Ap7kC3PlAOGeElMO1L1thDZdMd1MqClOEzie00fZwbUGXwkUdDV0_vd173GBACniEQF_9qtgDyxNzh9IMYPNVdRk0bqzBCdQuhTE1AQmWebTrri962uHdWex25KEk_sxOsSW5HIDc0vEF8uBBPUJjaHDPTvwzMh0RuqwT_SqwJvyOHhG0jSz-LYEa5eugQ",
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.ejzc2IOLtvYp-2n5w3w4SW3rHNG9pOahnwpQCwuIaj7DvO4SxDIzeJmFPMKTJUc-1zi5T42mS4Gs2r18KWhSkk8kqYermRX0VcGEEsH0r2BG5boeza_EjCoJ5-jBPX5ODWGhu2sZIkZl29IbaVSC8jk8qKnqacchiHNmuv_xXjRsAgUsqYftrEQOxqhpfL5KN2qtgeVTczg3ABqs2-SFeEzcgA1TnA9H3AynCPCVUMFgh7xyS8jxx7DN-1vRHBySz5gNbf8z8MNx_XBLfRxxxMF24rDIE8Z2gf1DEAPr4tT38hD8ugKSE84gC3xHJWFWsRLg-Ll6OQqshs82axS00Q",
 			},
 			wantUserInfo: UserInfo{
 				Subject:       "1234567890",
@@ -425,6 +432,35 @@ func TestUserInfoEndpoint(t *testing.T) {
 				Email:         "joe@doe.com",
 				EmailVerified: true,
 				claims:        []byte(userInfoJSON),
+			},
+		},
+		{
+			name: "basic json userinfo - cognito variant",
+			server: testServer{
+				contentType: "application/json",
+				userInfo:    userInfoJSONCognitoVariant,
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSONCognitoVariant),
+			},
+		},
+		{
+			name: "signed jwt userinfo - cognito variant",
+			server: testServer{
+				contentType: "application/jwt",
+				// generated with jwt.io based on the private/public key pair
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOiJ0cnVlIiwiaXNfYWRtaW4iOnRydWV9.V9j6Q208fnj7E5dhCHnAktqndvelyz6PYxmd2fLzA4ze8N770Tq9KFEE3QSM400GTxiP7tMyvBqnTj2q5Hr6DeRoy0WtLmYlnDfOJCr2qKbrPN0k94Ts9_sXAKEiJSKsTFUBHkrH4NhyWsaBaPamI8ghuqPKJ1LniNuskHUlzBmDDW4mTy15ArsaIno8S4XVn19OoqODIO30axJJxKfxEbsDR3-YW4OD9qn80Wzw0zOsGJ04NJRfO56VSprX0PhqvduOSUuHvm4cxtJIHHvj3AitrQriKZebZpXSs9PXPSPCysiQHyDz0A8y7R-sDgEhJlxe93nVbTU0itBehrbugQ",
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSONCognitoVariant),
 			},
 		},
 	}
@@ -448,6 +484,10 @@ func TestUserInfoEndpoint(t *testing.T) {
 
 			if info.Email != test.wantUserInfo.Email {
 				t.Errorf("expected UserInfo to be %v , got %v", test.wantUserInfo, info)
+			}
+
+			if info.EmailVerified != test.wantUserInfo.EmailVerified {
+				t.Errorf("expected UserInfo.EmailVerified to be %v , got %v", test.wantUserInfo.EmailVerified, info.EmailVerified)
 			}
 		})
 	}

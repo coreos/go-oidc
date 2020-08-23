@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -203,6 +204,16 @@ type UserInfo struct {
 	claims []byte
 }
 
+type userInfoRaw struct {
+	Subject string `json:"sub"`
+	Profile string `json:"profile"`
+	Email   string `json:"email"`
+	// Handle providers that return email_verified as a string
+	// https://forums.aws.amazon.com/thread.jspa?messageID=949441&#949441 and
+	// https://discuss.elastic.co/t/openid-error-after-authenticating-against-aws-cognito/206018/11
+	EmailVerified stringAsBool `json:"email_verified"`
+}
+
 // Claims unmarshals the raw JSON object claims into the provided object.
 func (u *UserInfo) Claims(v interface{}) error {
 	if u.claims == nil {
@@ -251,12 +262,17 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		body = payload
 	}
 
-	var userInfo UserInfo
+	var userInfo userInfoRaw
 	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
-	userInfo.claims = body
-	return &userInfo, nil
+	return &UserInfo{
+		Subject:       userInfo.Subject,
+		Profile:       userInfo.Profile,
+		Email:         userInfo.Email,
+		EmailVerified: bool(userInfo.EmailVerified),
+		claims:        body,
+	}, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
@@ -376,6 +392,28 @@ type idToken struct {
 type claimSource struct {
 	Endpoint    string `json:"endpoint"`
 	AccessToken string `json:"access_token"`
+}
+
+type stringAsBool bool
+
+func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
+	var result bool
+	err := json.Unmarshal(b, &result)
+	if err == nil {
+		*sb = stringAsBool(result)
+		return nil
+	}
+	var s string
+	err = json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	result, err = strconv.ParseBool(s)
+	if err != nil {
+		return err
+	}
+	*sb = stringAsBool(result)
+	return nil
 }
 
 type audience []string
