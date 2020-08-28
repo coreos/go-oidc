@@ -75,6 +75,7 @@ type Provider struct {
 	rawClaims []byte
 
 	remoteKeySet KeySet
+	client       *http.Client
 }
 
 type cachedKeys struct {
@@ -146,6 +147,9 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 			algs = append(algs, a)
 		}
 	}
+
+	client, _ := ctx.Value(oauth2.HTTPClient).(*http.Client)
+
 	return &Provider{
 		issuer:       p.Issuer,
 		authURL:      p.AuthURL,
@@ -153,7 +157,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		userInfoURL:  p.UserInfoURL,
 		algorithms:   algs,
 		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		remoteKeySet: NewRemoteKeySet(p.JWKSURL, client),
 	}, nil
 }
 

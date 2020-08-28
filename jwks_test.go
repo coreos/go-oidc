@@ -146,7 +146,7 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 	s := httptest.NewServer(&keyServer{keys: keySet})
 	defer s.Close()
 
-	rks := newRemoteKeySet(ctx, s.URL, nil)
+	rks := newRemoteKeySet(s.URL, nil, nil)
 
 	// Ensure the token verifies.
 	gotPayload, err := rks.verify(ctx, jws)
@@ -206,7 +206,7 @@ func TestCacheControl(t *testing.T) {
 	s := httptest.NewServer(server)
 	defer s.Close()
 
-	rks := newRemoteKeySet(ctx, s.URL, func() time.Time { return now })
+	rks := newRemoteKeySet(s.URL, nil, func() time.Time { return now })
 
 	if _, err := rks.verify(ctx, jws1); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pquerna/cachecontrol"
+	"golang.org/x/oauth2"
 	jose "gopkg.in/square/go-jose.v2"
 )
 
@@ -31,22 +32,20 @@ const keysExpiryDelta = 30 * time.Second
 //
 // The returned KeySet is a long lived verifier that caches keys based on cache-control
 // headers. Reuse a common remote key set instead of creating new ones as needed.
-//
-// The behavior of the returned KeySet is undefined once the context is canceled.
-func NewRemoteKeySet(ctx context.Context, jwksURL string) KeySet {
-	return newRemoteKeySet(ctx, jwksURL, time.Now)
+func NewRemoteKeySet(jwksURL string, client *http.Client) KeySet {
+	return newRemoteKeySet(jwksURL, client, time.Now)
 }
 
-func newRemoteKeySet(ctx context.Context, jwksURL string, now func() time.Time) *remoteKeySet {
+func newRemoteKeySet(jwksURL string, client *http.Client, now func() time.Time) *remoteKeySet {
 	if now == nil {
 		now = time.Now
 	}
-	return &remoteKeySet{jwksURL: jwksURL, ctx: ctx, now: now}
+	return &remoteKeySet{jwksURL: jwksURL, client: client, now: now}
 }
 
 type remoteKeySet struct {
 	jwksURL string
-	ctx     context.Context
+	client  *http.Client
 	now     func() time.Time
 
 	// guard all other fields
@@ -160,7 +159,7 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 		// once the goroutine is done.
 		go func() {
 			// Sync keys and finish inflight when that's done.
-			keys, expiry, err := r.updateKeys()
+			keys, expiry, err := r.updateKeys(ctx)
 
 			r.inflight.done(keys, err)
 
@@ -189,13 +188,16 @@ func (r *remoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 	}
 }
 
-func (r *remoteKeySet) updateKeys() ([]jose.JSONWebKey, time.Time, error) {
+func (r *remoteKeySet) updateKeys(ctx context.Context) ([]jose.JSONWebKey, time.Time, error) {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: can't create request: %v", err)
 	}
 
-	resp, err := doRequest(r.ctx, req)
+	if r.client != nil {
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, r.client)
+	}
+	resp, err := doRequest(ctx, req)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("oidc: get keys failed %v", err)
 	}
