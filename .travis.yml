@@ -2,6 +2,7 @@ language: go
 
 go:
   - "1.14"
+  - "1.15"
 
 install:
  - go get -v -t github.com/coreos/go-oidc/...
