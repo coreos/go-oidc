@@ -98,6 +98,11 @@ type Config struct {
 	// this option.
 	SkipIssuerCheck bool
 
+	// SkipSignatureVerification should not be used anywhere, and MUST NOT BE
+	// used in production.
+	// Completely skips signature verification of the given JWT.
+	SkipSignatureVerification bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 }
@@ -316,14 +321,16 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	t.sigAlgorithm = sig.Header.Algorithm
 
-	gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify signature: %v", err)
-	}
+	if !v.config.SkipSignatureVerification {
+		gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify signature: %v", err)
+		}
 
-	// Ensure that the payload returned by the square actually matches the payload parsed earlier.
-	if !bytes.Equal(gotPayload, payload) {
-		return nil, errors.New("oidc: internal error, payload parsed did not match previous payload")
+		// Ensure that the payload returned by the square actually matches the payload parsed earlier.
+		if !bytes.Equal(gotPayload, payload) {
+			return nil, errors.New("oidc: internal error, payload parsed did not match previous payload")
+		}
 	}
 
 	return t, nil
