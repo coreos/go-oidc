@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,11 @@ const (
 var (
 	errNoAtHash      = errors.New("id token did not have an access token hash")
 	errInvalidAtHash = errors.New("access token hash does not match value in ID token")
+
+	// Azure does not follow the OIDC spec, so we need to special-case it in order to use
+	// it as a shared provider
+	azureIssuer = regexp.MustCompile(
+		`^https://login\.microsoftonline\.com/(common|organizations)/v2\.0$`)
 )
 
 // ClientContext returns a new Context that carries the provided HTTP client.
@@ -138,7 +144,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		return nil, fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
 	}
 
-	if p.Issuer != issuer {
+	if p.Issuer != issuer && !azureIssuer.MatchString(issuer) {
 		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
 	}
 	var algs []string

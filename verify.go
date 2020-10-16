@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,6 +20,13 @@ import (
 const (
 	issuerGoogleAccounts         = "https://accounts.google.com"
 	issuerGoogleAccountsNoScheme = "accounts.google.com"
+)
+
+var (
+	issuerAzureAccounts      = regexp.MustCompile(
+		`^https://login\.microsoftonline\.com/(common|organizations)/v2\.0$`)
+	matchIssuerAzureAccounts = regexp.MustCompile(
+		`^https://login\.microsoftonline\.com/[0-9a-f\-]+/v2\.0$`)
 )
 
 // KeySet is a set of publc JSON Web Keys that can be used to validate the signature
@@ -251,11 +259,14 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	// Check issuer.
 	if !v.config.SkipIssuerCheck && t.Issuer != v.issuer {
 		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
-		// the required "https://accounts.google.com". Detect this case and allow it only
-		// for Google.
+		// the required "https://accounts.google.com".
 		//
-		// We will not add hooks to let other providers go off spec like this.
-		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
+		// Azure also requires a special case because if the verifier's issuer is set to
+		// "common" or "organizations", the issuer check would normally fail because the
+		// token's issuer is set to use the tenantID of the organization (instead of
+		// "common" or "organizations").
+		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) &&
+			!(issuerAzureAccounts.MatchString(v.issuer) && matchIssuerAzureAccounts.MatchString(t.Issuer)) {
 			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
 		}
 	}
