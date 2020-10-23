@@ -57,10 +57,45 @@ type IDTokenVerifier struct {
 //
 // Since KeySet is an interface, this constructor can also be used to supply custom
 // public key sources. For example, if a user wanted to supply public keys out-of-band
-// and hold them statically in-memory:
+// and hold them statically in-memory, they could define a struct staticKeySet,
+// that is created with a jose.JSONWebKeySet object containing the keys,
+// and implements the KeySet interface, verifying signatures against the local JWKS:
+//
+//
+//		type staticKeySet struct {
+//			keys jose.JSONWebKeySet
+//		}
+//
+//		func newStaticKeySet(keys jose.JSONWebKeySet) *staticKeySet {
+//			return &staticKeySet{keys: keys}
+//		}
+//
+//		func (l *staticKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) ([]byte, error) {
+//
+//			for _, key := range l.keys.Keys {
+//				_, _, payload, err := jws.VerifyMulti(key)
+//				if err != nil {
+//					return nil, fmt.Errorf("oidc: failed to verify id token signature: %v", err)
+//				}
+//
+//				return payload, nil
+//			}
+//
+//			return nil, errors.New("failed to verify id token signature")
+//		}
+//
+//		// VerifySignature verifies a JWT based on a static JSONWebKeySet
+//		func (l *staticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
+//			jws, err := jose.ParseSigned(jwt)
+//			if err != nil {
+//				return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+//			}
+//
+//			return l.verify(ctx, jws)
+//		}
 //
 //		// Custom KeySet implementation.
-//		keySet := newStatisKeySet(publicKeys...)
+//		keySet := newStaticKeySet(jwks)
 //
 //		// Verifier uses the custom KeySet implementation.
 //		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
