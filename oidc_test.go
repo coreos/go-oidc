@@ -109,6 +109,7 @@ func TestNewProvider(t *testing.T) {
 		trailingSlash   bool
 		wantAuthURL     string
 		wantTokenURL    string
+		wantJWKSURL     string
 		wantUserInfoURL string
 		wantAlgorithms  []string
 		wantErr         bool
@@ -124,6 +125,7 @@ func TestNewProvider(t *testing.T) {
 			}`,
 			wantAuthURL:    "https://example.com/auth",
 			wantTokenURL:   "https://example.com/token",
+			wantJWKSURL:    "https://example.com/keys",
 			wantAlgorithms: []string{"RS256"},
 		},
 		{
@@ -137,6 +139,7 @@ func TestNewProvider(t *testing.T) {
 			}`,
 			wantAuthURL:    "https://example.com/auth",
 			wantTokenURL:   "https://example.com/token",
+			wantJWKSURL:    "https://example.com/keys",
 			wantAlgorithms: []string{"RS256", "RS384", "ES256"},
 		},
 		{
@@ -152,6 +155,7 @@ func TestNewProvider(t *testing.T) {
 			}`,
 			wantAuthURL:    "https://example.com/auth",
 			wantTokenURL:   "https://example.com/token",
+			wantJWKSURL:    "https://example.com/keys",
 			wantAlgorithms: []string{"RS256", "RS384", "ES256"},
 		},
 		{
@@ -177,6 +181,7 @@ func TestNewProvider(t *testing.T) {
 			trailingSlash:  true,
 			wantAuthURL:    "https://example.com/auth",
 			wantTokenURL:   "https://example.com/token",
+			wantJWKSURL:    "https://example.com/keys",
 			wantAlgorithms: []string{"RS256"},
 		},
 		{
@@ -185,6 +190,7 @@ func TestNewProvider(t *testing.T) {
 			name:            "google",
 			wantAuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
 			wantTokenURL:    "https://oauth2.googleapis.com/token",
+			wantJWKSURL:     "https://www.googleapis.com/oauth2/v3/certs",
 			wantUserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
 			wantAlgorithms:  []string{"RS256"},
 			data: `{
@@ -288,6 +294,10 @@ func TestNewProvider(t *testing.T) {
 				t.Errorf("NewProvider() unexpected tokenURL value, got=%s, want=%s",
 					p.tokenURL, test.wantTokenURL)
 			}
+			if p.jwksURL != test.wantJWKSURL {
+				t.Errorf("NewProvider() unexpected jwksURL value, got=%s, want=%s",
+					p.jwksURL, test.wantJWKSURL)
+			}
 			if p.userInfoURL != test.wantUserInfoURL {
 				t.Errorf("NewProvider() unexpected userInfoURL value, got=%s, want=%s",
 					p.userInfoURL, test.wantUserInfoURL)
@@ -356,7 +366,6 @@ func (ts *testServer) run(t *testing.T) string {
 }
 
 func TestUserInfoEndpoint(t *testing.T) {
-
 	userInfoJSON := `{
 		"sub": "1234567890",
 		"profile": "Joe Doe",
@@ -478,5 +487,4 @@ func TestUserInfoEndpoint(t *testing.T) {
 			}
 		})
 	}
-
 }
