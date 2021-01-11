@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -397,22 +396,14 @@ type claimSource struct {
 type stringAsBool bool
 
 func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
-	var result bool
-	err := json.Unmarshal(b, &result)
-	if err == nil {
-		*sb = stringAsBool(result)
-		return nil
+	switch string(b) {
+	case "true", `"true"`:
+		*sb = stringAsBool(true)
+	case "false", `"false"`:
+		*sb = stringAsBool(false)
+	default:
+		return errors.New("invalid value for boolean")
 	}
-	var s string
-	err = json.Unmarshal(b, &s)
-	if err != nil {
-		return err
-	}
-	result, err = strconv.ParseBool(s)
-	if err != nil {
-		return err
-	}
-	*sb = stringAsBool(result)
 	return nil
 }
 
