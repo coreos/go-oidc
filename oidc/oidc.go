@@ -203,6 +203,16 @@ type UserInfo struct {
 	claims []byte
 }
 
+type userInfoRaw struct {
+	Subject string `json:"sub"`
+	Profile string `json:"profile"`
+	Email   string `json:"email"`
+	// Handle providers that return email_verified as a string
+	// https://forums.aws.amazon.com/thread.jspa?messageID=949441&#949441 and
+	// https://discuss.elastic.co/t/openid-error-after-authenticating-against-aws-cognito/206018/11
+	EmailVerified stringAsBool `json:"email_verified"`
+}
+
 // Claims unmarshals the raw JSON object claims into the provided object.
 func (u *UserInfo) Claims(v interface{}) error {
 	if u.claims == nil {
@@ -241,7 +251,9 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		return nil, fmt.Errorf("%s: %s", resp.Status, body)
 	}
 
-	if strings.EqualFold(resp.Header.Get("Content-Type"), "application/jwt") {
+	ct := resp.Header.Get("Content-Type")
+	mediaType, _, parseErr := mime.ParseMediaType(ct)
+	if parseErr == nil && mediaType == "application/jwt" {
 		payload, err := p.remoteKeySet.VerifySignature(ctx, string(body))
 		if err != nil {
 			return nil, fmt.Errorf("oidc: invalid userinfo jwt signature %v", err)
@@ -249,12 +261,17 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		body = payload
 	}
 
-	var userInfo UserInfo
+	var userInfo userInfoRaw
 	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
-	userInfo.claims = body
-	return &userInfo, nil
+	return &UserInfo{
+		Subject:       userInfo.Subject,
+		Profile:       userInfo.Profile,
+		Email:         userInfo.Email,
+		EmailVerified: bool(userInfo.EmailVerified),
+		claims:        body,
+	}, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
@@ -374,6 +391,20 @@ type idToken struct {
 type claimSource struct {
 	Endpoint    string `json:"endpoint"`
 	AccessToken string `json:"access_token"`
+}
+
+type stringAsBool bool
+
+func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
+	switch string(b) {
+	case "true", `"true"`:
+		*sb = stringAsBool(true)
+	case "false", `"false"`:
+		*sb = stringAsBool(false)
+	default:
+		return errors.New("invalid value for boolean")
+	}
+	return nil
 }
 
 type audience []string
