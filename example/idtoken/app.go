@@ -4,10 +4,14 @@ This is an example application to demonstrate parsing an ID Token.
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/net/context"
@@ -18,6 +22,25 @@ var (
 	clientID     = os.Getenv("GOOGLE_OAUTH2_CLIENT_ID")
 	clientSecret = os.Getenv("GOOGLE_OAUTH2_CLIENT_SECRET")
 )
+
+func randString(nByte int) (string, error) {
+	b := make([]byte, nByte)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func setCallbackCookie(w http.ResponseWriter, r *http.Request, name, value string) {
+	c := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		MaxAge:   int(time.Hour.Seconds()),
+		Secure:   r.TLS != nil,
+		HttpOnly: true,
+	}
+	http.SetCookie(w, c)
+}
 
 func main() {
 	ctx := context.Background()
@@ -39,14 +62,30 @@ func main() {
 		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 	}
 
-	state := "foobar" // Don't do this in production.
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, config.AuthCodeURL(state), http.StatusFound)
+		state, err := randString(16)
+		if err != nil {
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		nonce, err := randString(16)
+		if err != nil {
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		setCallbackCookie(w, r, "state", state)
+		setCallbackCookie(w, r, "nonce", nonce)
+
+		http.Redirect(w, r, config.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
 	})
 
 	http.HandleFunc("/auth/google/callback", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("state") != state {
+		state, err := r.Cookie("state")
+		if err != nil {
+			http.Error(w, "state not found", http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("state") != state.Value {
 			http.Error(w, "state did not match", http.StatusBadRequest)
 			return
 		}
@@ -64,6 +103,16 @@ func main() {
 		idToken, err := verifier.Verify(ctx, rawIDToken)
 		if err != nil {
 			http.Error(w, "Failed to verify ID Token: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		nonce, err := r.Cookie("nonce")
+		if err != nil {
+			http.Error(w, "nonce not found", http.StatusBadRequest)
+			return
+		}
+		if idToken.Nonce != nonce.Value {
+			http.Error(w, "nonce did not match", http.StatusBadRequest)
 			return
 		}
 
