@@ -207,14 +207,14 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
-		return nil, &MalformedJwtError{ParseError: err}
+		return nil, &MalformedJWTError{ParseError: err}
 	}
 
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
 	// us do cheap checks before possibly re-syncing keys.
 	payload, err := parseJWT(rawIDToken)
 	if err != nil {
-		return nil, &MalformedJwtError{ParseError: err}
+		return nil, &MalformedJWTError{ParseError: err}
 	}
 	var token idToken
 	if err := json.Unmarshal(payload, &token); err != nil {

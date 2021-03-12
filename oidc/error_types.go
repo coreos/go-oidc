@@ -6,12 +6,12 @@ import (
 )
 
 // MalformedJWTError is returned when the JWT can't be parsed
-type MalformedJwtError struct {
+type MalformedJWTError struct {
 	ParseError error
 }
 
 // Error interface
-func (e *MalformedJwtError) Error() string {
+func (e *MalformedJWTError) Error() string {
 	return fmt.Sprintf("oidc: malformed jwt: %v", e.ParseError)
 }
 
