@@ -45,8 +45,9 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:   newRSAKey(t),
+			wantErr:   true,
+			errorType: reflect.TypeOf(&InvalidIssuerError{}),
 		},
 		{
 			name:    "skip issuer check",
@@ -69,6 +70,7 @@ func TestVerify(t *testing.T) {
 			signKey:         newRSAKey(t),
 			verificationKey: newRSAKey(t),
 			wantErr:         true,
+			errorType:       reflect.TypeOf(&InvalidSignatureError{}),
 		},
 		{
 			name:    "google accounts without scheme",
@@ -86,8 +88,9 @@ func TestVerify(t *testing.T) {
 			config: Config{
 				SkipClientIDCheck: true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:   newRSAKey(t),
+			wantErr:   true,
+			errorType: reflect.TypeOf(&ExpiredTokenError{}),
 		},
 		{
 			name:    "unexpired token",
@@ -114,8 +117,9 @@ func TestVerify(t *testing.T) {
 			config: Config{
 				SkipClientIDCheck: true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:   newRSAKey(t),
+			wantErr:   true,
+			errorType: reflect.TypeOf(&TokenNotYetValidError{}),
 		},
 		{
 			name: "nbf in past",
@@ -159,8 +163,9 @@ func TestVerifyAudience(t *testing.T) {
 				ClientID:        "client1",
 				SkipExpiryCheck: true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:   newRSAKey(t),
+			wantErr:   true,
+			errorType: reflect.TypeOf(&InvalidAudienceError{}),
 		},
 		{
 			name:    "multiple audiences, one matches",
@@ -195,8 +200,9 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
 			},
-			signKey: newECDSAKey(t),
-			wantErr: true,
+			signKey:   newECDSAKey(t),
+			wantErr:   true,
+			errorType: reflect.TypeOf(&UnsupportedSigningError{}),
 		},
 		{
 			name:    "ecdsa signing",
@@ -226,8 +232,9 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipClientIDCheck:    true,
 				SkipExpiryCheck:      true,
 			},
-			signKey: newECDSAKey(t),
-			wantErr: true,
+			signKey:   newECDSAKey(t),
+			wantErr:   true,
+			errorType: reflect.TypeOf(&UnsupportedSigningError{}),
 		},
 	}
 	for _, test := range tests {
@@ -263,9 +270,10 @@ func TestAccessTokenHash(t *testing.T) {
 
 func TestDistributedClaims(t *testing.T) {
 	tests := []struct {
-		test    verificationTest
-		want    map[string]claimSource
-		wantErr bool
+		test      verificationTest
+		want      map[string]claimSource
+		wantErr   bool
+		errorType reflect.Type
 	}{
 		{
 			test: verificationTest{
@@ -298,7 +306,7 @@ func TestDistributedClaims(t *testing.T) {
 				signKey: newRSAKey(t),
 			},
 			want: map[string]claimSource{
-				"address": claimSource{Endpoint: "123", AccessToken: "1234"},
+				"address": {Endpoint: "123", AccessToken: "1234"},
 			},
 		},
 		{
@@ -321,8 +329,8 @@ func TestDistributedClaims(t *testing.T) {
 				signKey: newRSAKey(t),
 			},
 			want: map[string]claimSource{
-				"address":      claimSource{Endpoint: "123", AccessToken: "1234"},
-				"phone_number": claimSource{Endpoint: "123", AccessToken: "1234"},
+				"address":      {Endpoint: "123", AccessToken: "1234"},
+				"phone_number": {Endpoint: "123", AccessToken: "1234"},
 			},
 		},
 		{
@@ -342,7 +350,8 @@ func TestDistributedClaims(t *testing.T) {
 				},
 				signKey: newRSAKey(t),
 			},
-			wantErr: true,
+			wantErr:   true,
+			errorType: reflect.TypeOf(&InvalidClaimSourceError{}),
 		},
 		{
 			test: verificationTest{
@@ -371,6 +380,11 @@ func TestDistributedClaims(t *testing.T) {
 				if !test.wantErr {
 					t.Errorf("parsing token: %v", err)
 				}
+
+				if reflect.TypeOf(err) != test.errorType {
+					t.Errorf("invalid error type: expected '%v' got '%v'", test.errorType, reflect.TypeOf(err))
+				}
+
 				return
 			}
 			if test.wantErr {
@@ -455,6 +469,7 @@ func TestDistClaimResolver(t *testing.T) {
 				if !test.wantErr {
 					t.Errorf("%v", err)
 				}
+
 				return
 			}
 			if test.wantErr {
@@ -544,8 +559,9 @@ type verificationTest struct {
 	// testing invalid signatures.
 	verificationKey *signingKey
 
-	config  Config
-	wantErr bool
+	config    Config
+	wantErr   bool
+	errorType reflect.Type
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
@@ -576,5 +592,11 @@ func (v verificationTest) run(t *testing.T) {
 	}
 	if err == nil && v.wantErr {
 		t.Errorf("expected error")
+	}
+	if err != nil && v.wantErr && v.errorType != reflect.TypeOf(err) {
+		t.Errorf("wrong error type: expected '%v' got '%v'",
+			v.errorType,
+			reflect.TypeOf(err),
+		)
 	}
 }

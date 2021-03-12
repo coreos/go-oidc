@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -208,18 +207,18 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+		return nil, &MalformedJwtError{ParseError: err}
 	}
 
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
 	// us do cheap checks before possibly re-syncing keys.
 	payload, err := parseJWT(rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+		return nil, &MalformedJwtError{ParseError: err}
 	}
 	var token idToken
 	if err := json.Unmarshal(payload, &token); err != nil {
-		return nil, fmt.Errorf("oidc: failed to unmarshal claims: %v", err)
+		return nil, &MalformedPayloadError{UnmarshalError: err}
 	}
 
 	distributedClaims := make(map[string]claimSource)
@@ -227,11 +226,11 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	//step through the token to map claim names to claim sources"
 	for cn, src := range token.ClaimNames {
 		if src == "" {
-			return nil, fmt.Errorf("oidc: failed to obtain source from claim name")
+			return nil, &InvalidClaimNameError{Name: cn}
 		}
 		s, ok := token.ClaimSources[src]
 		if !ok {
-			return nil, fmt.Errorf("oidc: source does not exist")
+			return nil, &InvalidClaimSourceError{Name: cn, Source: src}
 		}
 		distributedClaims[cn] = s
 	}
@@ -256,7 +255,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		//
 		// We will not add hooks to let other providers go off spec like this.
 		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
-			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+			return nil, &InvalidIssuerError{Expected: v.issuer, Actual: t.Issuer}
 		}
 	}
 
@@ -266,10 +265,10 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	if !v.config.SkipClientIDCheck {
 		if v.config.ClientID != "" {
 			if !contains(t.Audience, v.config.ClientID) {
-				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
+				return nil, &InvalidAudienceError{Expected: v.config.ClientID, Actual: t.Audience}
 			}
 		} else {
-			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")
+			return nil, &InvalidClientIDConfigurationError{}
 		}
 	}
 
@@ -282,7 +281,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		nowTime := now()
 
 		if t.Expiry.Before(nowTime) {
-			return nil, fmt.Errorf("oidc: token is expired (Token Expiry: %v)", t.Expiry)
+			return nil, &ExpiredTokenError{Expiry: t.Expiry}
 		}
 
 		// If nbf claim is provided in token, ensure that it is indeed in the past.
@@ -291,17 +290,17 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 			leeway := 1 * time.Minute
 
 			if nowTime.Add(leeway).Before(nbfTime) {
-				return nil, fmt.Errorf("oidc: current time %v before the nbf (not before) time: %v", nowTime, nbfTime)
+				return nil, &TokenNotYetValidError{NowTime: nowTime, NbfTime: nbfTime}
 			}
 		}
 	}
 
 	switch len(jws.Signatures) {
 	case 0:
-		return nil, fmt.Errorf("oidc: id token not signed")
+		return nil, &UnsignedTokenError{}
 	case 1:
 	default:
-		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
+		return nil, &MultipleSignaturesError{}
 	}
 
 	sig := jws.Signatures[0]
@@ -311,19 +310,19 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	}
 
 	if !contains(supportedSigAlgs, sig.Header.Algorithm) {
-		return nil, fmt.Errorf("oidc: id token signed with unsupported algorithm, expected %q got %q", supportedSigAlgs, sig.Header.Algorithm)
+		return nil, &UnsupportedSigningError{Supported: supportedSigAlgs, Provided: sig.Header.Algorithm}
 	}
 
 	t.sigAlgorithm = sig.Header.Algorithm
 
 	gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify signature: %v", err)
+		return nil, &InvalidSignatureError{VerificationError: err}
 	}
 
 	// Ensure that the payload returned by the square actually matches the payload parsed earlier.
 	if !bytes.Equal(gotPayload, payload) {
-		return nil, errors.New("oidc: internal error, payload parsed did not match previous payload")
+		return nil, &PayloadMismatchError{}
 	}
 
 	return t, nil
