@@ -18,8 +18,8 @@ import (
 // exposed for providers that don't support discovery or to prevent round trips to the
 // discovery URL.
 //
-// The returned KeySet is a long lived verifier that caches keys based on cache-control
-// headers. Reuse a common remote key set instead of creating new ones as needed.
+// The returned KeySet is a long lived verifier that caches keys based on any
+// keys change. Reuse a common remote key set instead of creating new ones as needed.
 func NewRemoteKeySet(ctx context.Context, jwksURL string) *RemoteKeySet {
 	return newRemoteKeySet(ctx, jwksURL, time.Now)
 }
