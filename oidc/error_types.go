@@ -90,7 +90,7 @@ func (e *ExpiredTokenError) Error() string {
 	return fmt.Sprintf("oidc: toke ins expired (Toke Expiry: %v)", e.Expiry)
 }
 
-// TokenNotYetValid is returned when a token supplies NotBefore but is dated
+// TokenNotYetValidError is returned when a token supplies NotBefore but is dated
 // after it
 type TokenNotYetValidError struct {
 	NowTime time.Time
