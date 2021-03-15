@@ -87,7 +87,7 @@ type ExpiredTokenError struct {
 
 // Error interface
 func (e *ExpiredTokenError) Error() string {
-	return fmt.Sprintf("oidc: token ss expired (Token Expiry: %v)", e.Expiry)
+	return fmt.Sprintf("oidc: token is expired (Token Expiry: %v)", e.Expiry)
 }
 
 // TokenNotYetValidError is returned when a token supplies NotBefore but is dated
