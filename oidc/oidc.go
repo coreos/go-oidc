@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	jose "gopkg.in/square/go-jose.v2"
 )
 
 const (
@@ -56,7 +55,7 @@ func ClientContext(ctx context.Context, client *http.Client) context.Context {
 }
 
 // cloneContext copies a context's bag-of-values into a new context that isn't
-// associated with its cancelation. This is used to initialize remote keys sets
+// associated with its cancellation. This is used to initialize remote keys sets
 // which run in the background and aren't associated with the initial context.
 func cloneContext(ctx context.Context) context.Context {
 	cp := context.Background()
@@ -86,11 +85,6 @@ type Provider struct {
 	rawClaims []byte
 
 	remoteKeySet KeySet
-}
-
-type cachedKeys struct {
-	keys   []jose.JSONWebKey
-	expiry time.Time
 }
 
 type providerJSON struct {
@@ -398,9 +392,9 @@ type stringAsBool bool
 func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
 	switch string(b) {
 	case "true", `"true"`:
-		*sb = stringAsBool(true)
+		*sb = true
 	case "false", `"false"`:
-		*sb = stringAsBool(false)
+		*sb = false
 	default:
 		return errors.New("invalid value for boolean")
 	}
@@ -419,7 +413,7 @@ func (a *audience) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &auds); err != nil {
 		return err
 	}
-	*a = audience(auds)
+	*a = auds
 	return nil
 }
 
