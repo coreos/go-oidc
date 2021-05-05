@@ -39,7 +39,7 @@ type RemoteKeySet struct {
 	now     func() time.Time
 
 	// guard all other fields
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	// inflight suppresses parallel execution of updateKeys and allows
 	// multiple goroutines to wait for its result.
@@ -131,8 +131,8 @@ func (r *RemoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 }
 
 func (r *RemoteKeySet) keysFromCache() (keys []jose.JSONWebKey) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.cachedKeys
 }
 
