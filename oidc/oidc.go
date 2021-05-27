@@ -189,22 +189,54 @@ func (p *Provider) Endpoint() oauth2.Endpoint {
 
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
-	Subject       string `json:"sub"`
-	Profile       string `json:"profile"`
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
+	Subject             string `json:"sub"`
+	Name                string `json:"name"`
+	GivenName           string `json:"given_name"`
+	FamilyName          string `json:"family_name"`
+	MiddleName          string `json:"middle_name"`
+	Nickname            string `json:"nickname"`
+	PreferredUsername   string `json:"preferred_username"`
+	Profile             string `json:"profile"`
+	Picture             string `json:"picture"`
+	Website             string `json:"website"`
+	Email               string `json:"email"`
+	EmailVerified       bool   `json:"email_verified"`
+	Gender              string `json:"gender"`
+	Birthdate           string `json:"birthdate"`
+	Zoneinfo            string `json:"zoneinfo"`
+	Locale              string `json:"locale"`
+	PhoneNumber         string `json:"phone_number"`
+	PhoneNumberVerified bool   `json:"phone_number_verified"`
+	Address             string `json:"address"`
+	UpdatedAt           string `json:"updated_at"`
 
 	claims []byte
 }
 
 type userInfoRaw struct {
-	Subject string `json:"sub"`
-	Profile string `json:"profile"`
-	Email   string `json:"email"`
+	Subject           string `json:"sub"`
+	Name              string `json:"name"`
+	GivenName         string `json:"given_name"`
+	FamilyName        string `json:"family_name"`
+	MiddleName        string `json:"middle_name"`
+	Nickname          string `json:"nickname"`
+	PreferredUsername string `json:"preferred_username"`
+	Profile           string `json:"profile"`
+	Picture           string `json:"picture"`
+	Website           string `json:"website"`
+	Email             string `json:"email"`
 	// Handle providers that return email_verified as a string
 	// https://forums.aws.amazon.com/thread.jspa?messageID=949441&#949441 and
 	// https://discuss.elastic.co/t/openid-error-after-authenticating-against-aws-cognito/206018/11
-	EmailVerified stringAsBool `json:"email_verified"`
+	EmailVerified       stringAsBool `json:"email_verified"`
+	Gender              string       `json:"gender"`
+	Birthdate           string       `json:"birthdate"`
+	Zoneinfo            string       `json:"zoneinfo"`
+	Locale              string       `json:"locale"`
+	PhoneNumber         string       `json:"phone_number"`
+	PhoneNumberVerified stringAsBool `json:"phone_number_verified"`
+	Address             string       `json:"address"`
+	UpdatedAt           string       `json:"updated_at"`
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -260,11 +292,27 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
 	return &UserInfo{
-		Subject:       userInfo.Subject,
-		Profile:       userInfo.Profile,
-		Email:         userInfo.Email,
-		EmailVerified: bool(userInfo.EmailVerified),
-		claims:        body,
+		Subject:             userInfo.Subject,
+		Name:                userInfo.Name,
+		GivenName:           userInfo.GivenName,
+		FamilyName:          userInfo.FamilyName,
+		MiddleName:          userInfo.MiddleName,
+		Nickname:            userInfo.Nickname,
+		PreferredUsername:   userInfo.PreferredUsername,
+		Profile:             userInfo.Profile,
+		Picture:             userInfo.Picture,
+		Website:             userInfo.Website,
+		Email:               userInfo.Email,
+		EmailVerified:       bool(userInfo.EmailVerified),
+		Gender:              userInfo.Gender,
+		Birthdate:           userInfo.Birthdate,
+		Zoneinfo:            userInfo.Zoneinfo,
+		Locale:              userInfo.Locale,
+		PhoneNumber:         userInfo.PhoneNumber,
+		PhoneNumberVerified: bool(userInfo.PhoneNumberVerified),
+		Address:             userInfo.Address,
+		UpdatedAt:           userInfo.UpdatedAt,
+		claims:              body,
 	}, nil
 }
 
