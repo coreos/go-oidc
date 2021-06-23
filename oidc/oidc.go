@@ -81,6 +81,8 @@ type Provider struct {
 	userInfoURL string
 	algorithms  []string
 
+	// openid configuration Provided by the issuer
+	openIdConfiguration providerJSON
 	// Raw claims returned by the server.
 	rawClaims []byte
 
@@ -94,6 +96,29 @@ type providerJSON struct {
 	JWKSURL     string   `json:"jwks_uri"`
 	UserInfoURL string   `json:"userinfo_endpoint"`
 	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
+
+	// Remaining Fields
+	TokenEndpointAuthMethodsSupported          []string `json:"token_endpoint_auth_methods_supported"`
+	TokenEndpointAuthSigningAlgValuesSupported []string `json:"token_endpoint_auth_signing_alg_values_supported"`
+	CheckSessionIframe                         string   `json:"check_session_iframe"`
+	EndSessionEndpoint                         string   `json:"end_session_endpoint"`
+	RegistrationEndpoint                       string   `json:"registration_endpoint"`
+	ScopesSupported                            []string `json:"scopes_supported"`
+	ResponseTypesSupported                     []string `json:"response_types_supported"`
+	AcrValuesSupported                         []string `json:"acr_values_supported"`
+	SubjectTypesSupported                      []string `json:"subject_types_supported"`
+	UserinfoSigningAlgValuesSupported          []string `json:"userinfo_signing_alg_values_supported"`
+	UserinfoEncryptionAlgValuesSupported       []string `json:"userinfo_encryption_alg_values_supported"`
+	UserinfoEncryptionEncValuesSupported       []string `json:"userinfo_encryption_enc_values_supported"`
+	IDTokenEncryptionAlgValuesSupported        []string `json:"id_token_encryption_alg_values_supported"`
+	IDTokenEncryptionEncValuesSupported        []string `json:"id_token_encryption_enc_values_supported"`
+	RequestObjectSigningAlgValuesSupported     []string `json:"request_object_signing_alg_values_supported"`
+	DisplayValuesSupported                     []string `json:"display_values_supported"`
+	ClaimTypesSupported                        []string `json:"claim_types_supported"`
+	ClaimsSupported                            []string `json:"claims_supported"`
+	ClaimsParameterSupported                   bool     `json:"claims_parameter_supported"`
+	ServiceDocumentation                       string   `json:"service_documentation"`
+	UILocalesSupported                         []string `json:"ui_locales_supported"`
 }
 
 // supportedAlgorithms is a list of algorithms explicitly supported by this
@@ -152,13 +177,14 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		}
 	}
 	return &Provider{
-		issuer:       p.Issuer,
-		authURL:      p.AuthURL,
-		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
-		algorithms:   algs,
-		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
+		issuer:              p.Issuer,
+		authURL:             p.AuthURL,
+		tokenURL:            p.TokenURL,
+		userInfoURL:         p.UserInfoURL,
+		algorithms:          algs,
+		rawClaims:           body,
+		openIdConfiguration: p,
+		remoteKeySet:        NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
 	}, nil
 }
 
@@ -180,6 +206,10 @@ func (p *Provider) Claims(v interface{}) error {
 		return errors.New("oidc: claims not set")
 	}
 	return json.Unmarshal(p.rawClaims, v)
+}
+
+func (p *Provider) OpenIdConfiguration() providerJSON {
+	return p.openIdConfiguration
 }
 
 // Endpoint returns the OAuth2 auth and token endpoints for the given provider.
