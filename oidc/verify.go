@@ -98,6 +98,9 @@ type Config struct {
 	// this option.
 	SkipIssuerCheck bool
 
+	// AdfsCompatibility accepts tokens issued by ADFS which are breaking the standard.
+	AdfsCompatibility bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 }
@@ -250,13 +253,20 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	// Check issuer.
 	if !v.config.SkipIssuerCheck && t.Issuer != v.issuer {
-		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
-		// the required "https://accounts.google.com". Detect this case and allow it only
-		// for Google.
-		//
-		// We will not add hooks to let other providers go off spec like this.
-		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
-			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+		if v.config.AdfsCompatibility {
+			expectedIssuer := v.issuer + "/services/trust"
+			if t.Issuer != expectedIssuer {
+				return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", expectedIssuer, t.Issuer)
+			}
+		} else {
+			// Google sometimes returns "accounts.google.com" as the issuer claim instead of
+			// the required "https://accounts.google.com". Detect this case and allow it only
+			// for Google.
+			//
+			// We will not add hooks to let other providers go off spec like this.
+			if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
+				return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+			}
 		}
 	}
 
