@@ -145,6 +145,17 @@ func TestVerify(t *testing.T) {
 			},
 			signKey: newRSAKey(t),
 		},
+		{
+			name:    "adfs token with invalid issuer",
+			idToken: `{"iss":"https://invalid/services/trust"}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+				AdfsCompatibility: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)
@@ -476,7 +487,6 @@ func TestDistClaimResolver(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 type resolverTest struct {
@@ -580,6 +590,8 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 }
 
 func (v verificationTest) run(t *testing.T) {
+	t.Helper()
+
 	_, err := v.runGetToken(t)
 	if err != nil && !v.wantErr {
 		t.Errorf("%v", err)
