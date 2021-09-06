@@ -156,6 +156,16 @@ func TestVerify(t *testing.T) {
 			signKey: newRSAKey(t),
 			wantErr: true,
 		},
+		{
+			name:    "adfs token with proper standard issuer",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+				AdfsCompatibility: true,
+			},
+			signKey: newRSAKey(t),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)
