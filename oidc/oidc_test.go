@@ -110,16 +110,17 @@ func TestAccessTokenVerification(t *testing.T) {
 
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
-		name              string
-		data              string
-		issuerURLOverride string
-		trailingSlash     bool
-		wantAuthURL       string
-		wantTokenURL      string
-		wantUserInfoURL   string
-		wantIssuerURL     string
-		wantAlgorithms    []string
-		wantErr           bool
+		name                       string
+		data                       string
+		issuerURLOverride          string
+		trailingSlash              bool
+		wantAuthURL                string
+		wantTokenURL               string
+		wantUserInfoURL            string
+		wantIssuerURL              string
+		wantDeviceAuthorizationURL string
+		wantAlgorithms             []string
+		wantErr                    bool
 	}{
 		{
 			name: "basic_case",
@@ -205,11 +206,12 @@ func TestNewProvider(t *testing.T) {
 		{
 			// Test case taken directly from:
 			// https://accounts.google.com/.well-known/openid-configuration
-			name:            "google",
-			wantAuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
-			wantTokenURL:    "https://oauth2.googleapis.com/token",
-			wantUserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
-			wantAlgorithms:  []string{"RS256"},
+			name:                       "google",
+			wantAuthURL:                "https://accounts.google.com/o/oauth2/v2/auth",
+			wantTokenURL:               "https://oauth2.googleapis.com/token",
+			wantUserInfoURL:            "https://openidconnect.googleapis.com/v1/userinfo",
+			wantDeviceAuthorizationURL: "https://oauth2.googleapis.com/device/code",
+			wantAlgorithms:             []string{"RS256"},
 			data: `{
  "issuer": "ISSUER",
  "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
@@ -323,6 +325,10 @@ func TestNewProvider(t *testing.T) {
 			if p.userInfoURL != test.wantUserInfoURL {
 				t.Errorf("NewProvider() unexpected userInfoURL value, got=%s, want=%s",
 					p.userInfoURL, test.wantUserInfoURL)
+			}
+			if p.deviceAuthorizationURL != test.wantDeviceAuthorizationURL {
+				t.Errorf("NewProvider() unexpected deviceAuthorizationURL value, got=%s, want=%s",
+					p.deviceAuthorizationURL, test.wantDeviceAuthorizationURL)
 			}
 			if !reflect.DeepEqual(p.algorithms, test.wantAlgorithms) {
 				t.Errorf("NewProvider() unexpected algorithms value, got=%s, want=%s",
