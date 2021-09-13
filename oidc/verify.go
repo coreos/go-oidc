@@ -38,9 +38,10 @@ type KeySet interface {
 
 // IDTokenVerifier provides verification for ID Tokens.
 type IDTokenVerifier struct {
-	keySet KeySet
-	config *Config
-	issuer string
+	keySet            KeySet
+	config            *Config
+	issuer            string
+	accessTokenIssuer string
 }
 
 // NewVerifier returns a verifier manually constructed from a key set and issuer URL.
@@ -65,8 +66,8 @@ type IDTokenVerifier struct {
 //		// Verifier uses the custom KeySet implementation.
 //		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
 //
-func NewVerifier(issuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
-	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL}
+func NewVerifier(issuerURL, accessTokenIssuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
+	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL, accessTokenIssuer: accessTokenIssuerURL}
 }
 
 // Config is the configuration for an IDTokenVerifier.
@@ -98,6 +99,9 @@ type Config struct {
 	// this option.
 	SkipIssuerCheck bool
 
+	// AdfsCompatibility accepts tokens issued by ADFS which are breaking the standard.
+	AdfsCompatibility bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 }
@@ -114,7 +118,8 @@ func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
 		cp.SupportedSigningAlgs = p.algorithms
 		config = cp
 	}
-	return NewVerifier(p.issuer, p.remoteKeySet, config)
+
+	return NewVerifier(p.issuer, p.accessTokenIssuer, p.remoteKeySet, config)
 }
 
 func parseJWT(p string) ([]byte, error) {
@@ -210,7 +215,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	distributedClaims := make(map[string]claimSource)
 
-	//step through the token to map claim names to claim sources"
+	// step through the token to map claim names to claim sources"
 	for cn, src := range token.ClaimNames {
 		if src == "" {
 			return nil, fmt.Errorf("oidc: failed to obtain source from claim name")
@@ -236,12 +241,24 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	// Check issuer.
 	if !v.config.SkipIssuerCheck && t.Issuer != v.issuer {
-		// Google sometimes returns "accounts.google.com" as the issuer claim instead of
-		// the required "https://accounts.google.com". Detect this case and allow it only
-		// for Google.
-		//
-		// We will not add hooks to let other providers go off spec like this.
-		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
+		if v.config.AdfsCompatibility && len(v.accessTokenIssuer) > 0 {
+			// ADFS might define an access token issuer url which is separate from the issuer url.
+			// In this case we should compare the token issuer against the access token issuer.
+			// More details can be found here:
+			// https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-oidce/586de7dd-3385-47c7-93a2-935d9e90441c
+			if t.Issuer != v.accessTokenIssuer {
+				return nil, fmt.Errorf("oidc: id token issued by a different provider, expected access token issuer %q got %q", v.accessTokenIssuer, t.Issuer)
+			}
+		} else if v.issuer == issuerGoogleAccounts {
+			// Google sometimes returns "accounts.google.com" as the issuer claim instead of
+			// the required "https://accounts.google.com". Detect this case and allow it only
+			// for Google.
+			//
+			// We will not add hooks to let other providers go off spec like this.
+			if t.Issuer != issuerGoogleAccountsNoScheme {
+				return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", issuerGoogleAccountsNoScheme, t.Issuer)
+			}
+		} else {
 			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
 		}
 	}

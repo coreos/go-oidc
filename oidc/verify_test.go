@@ -466,7 +466,6 @@ func TestDistClaimResolver(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 type resolverTest struct {
@@ -490,7 +489,7 @@ type resolverTest struct {
 	wantErr bool
 	want    map[string]claimSource
 
-	//this is the access token that the testEndpoint will accept
+	// this is the access token that the testEndpoint will accept
 	accessToken string
 }
 
@@ -517,7 +516,7 @@ func (v resolverTest) testEndpoint(t *testing.T) ([]byte, error) {
 	} else {
 		ks = &testVerifier{v.verificationKey.jwk()}
 	}
-	verifier := NewVerifier(issuer, ks, &v.config)
+	verifier := NewVerifier(issuer, "", ks, &v.config)
 
 	ctx = ClientContext(ctx, s.Client())
 
@@ -564,7 +563,7 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 	} else {
 		ks = &testVerifier{v.verificationKey.jwk()}
 	}
-	verifier := NewVerifier(issuer, ks, &v.config)
+	verifier := NewVerifier(issuer, "", ks, &v.config)
 
 	return verifier.Verify(ctx, token)
 }
