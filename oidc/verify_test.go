@@ -135,6 +135,18 @@ func TestVerify(t *testing.T) {
 			},
 			signKey: newRSAKey(t),
 		},
+		{
+			name:              "test ADFS with distinct access token issuer",
+			idToken:           `{"iss":"https://bar"}`,
+			issuer:            "https://foo",
+			accessTokenIssuer: "https://bar",
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+				AdfsCompatibility: true,
+			},
+			signKey: newRSAKey(t),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)
@@ -534,6 +546,9 @@ type verificationTest struct {
 	// If not provided defaults to "https://foo"
 	issuer string
 
+	// If not provided defaults to ""
+	accessTokenIssuer string
+
 	// JWT payload (just the claims).
 	idToken string
 
@@ -563,7 +578,7 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 	} else {
 		ks = &testVerifier{v.verificationKey.jwk()}
 	}
-	verifier := NewVerifier(issuer, "", ks, &v.config)
+	verifier := NewVerifier(issuer, v.accessTokenIssuer, ks, &v.config)
 
 	return verifier.Verify(ctx, token)
 }
