@@ -242,7 +242,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	// Check issuer.
 	if !v.config.SkipIssuerCheck && t.Issuer != v.issuer {
 		if v.config.AdfsCompatibility && len(v.accessTokenIssuer) > 0 {
-			// ADFS might define an access token issuer url which is separate from the issuer url.
+			// ADFS might define an access token issuer url which is distinct from the issuer url.
 			// In this case we should compare the token issuer against the access token issuer.
 			// More details can be found here:
 			// https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-oidce/586de7dd-3385-47c7-93a2-935d9e90441c
