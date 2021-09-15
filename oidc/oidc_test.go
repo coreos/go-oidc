@@ -104,14 +104,16 @@ func TestAccessTokenVerification(t *testing.T) {
 
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
-		name            string
-		data            string
-		trailingSlash   bool
-		wantAuthURL     string
-		wantTokenURL    string
-		wantUserInfoURL string
-		wantAlgorithms  []string
-		wantErr         bool
+		name              string
+		data              string
+		issuerURLOverride string
+		trailingSlash     bool
+		wantAuthURL       string
+		wantTokenURL      string
+		wantUserInfoURL   string
+		wantIssuerURL     string
+		wantAlgorithms    []string
+		wantErr           bool
 	}{
 		{
 			name: "basic_case",
@@ -164,6 +166,21 @@ func TestNewProvider(t *testing.T) {
 				"id_token_signing_alg_values_supported": ["RS256"]
 			}`,
 			wantErr: true,
+		},
+		{
+			name:              "mismatched_issuer_discovery_override",
+			issuerURLOverride: "https://example.com",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			wantIssuerURL:  "https://example.com",
+			wantAuthURL:    "https://example.com/auth",
+			wantTokenURL:   "https://example.com/token",
+			wantAlgorithms: []string{"RS256"},
 		},
 		{
 			name: "issuer_with_trailing_slash",
@@ -269,6 +286,10 @@ func TestNewProvider(t *testing.T) {
 				issuer += "/"
 			}
 
+			if test.issuerURLOverride != "" {
+				ctx = InsecureIssuerURLContext(ctx, test.issuerURLOverride)
+			}
+
 			p, err := NewProvider(ctx, issuer)
 			if err != nil {
 				if !test.wantErr {
@@ -278,6 +299,11 @@ func TestNewProvider(t *testing.T) {
 			}
 			if test.wantErr {
 				t.Fatalf("NewProvider(): expected error")
+			}
+
+			if test.wantIssuerURL != "" && p.issuer != test.wantIssuerURL {
+				t.Errorf("NewProvider() unexpected issuer value, got=%s, want=%s",
+					p.issuer, test.wantIssuerURL)
 			}
 
 			if p.authURL != test.wantAuthURL {
