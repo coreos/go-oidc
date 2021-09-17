@@ -39,6 +39,10 @@ var (
 	errInvalidAtHash = errors.New("access token hash does not match value in ID token")
 )
 
+type contextKey int
+
+var issuerURLKey contextKey
+
 // ClientContext returns a new Context that carries the provided HTTP client.
 //
 // This method sets the same context key used by the golang.org/x/oauth2 package,
@@ -63,6 +67,25 @@ func cloneContext(ctx context.Context) context.Context {
 		cp = ClientContext(cp, c)
 	}
 	return cp
+}
+
+// InsecureIssuerURLContext allows discovery to work when the issuer_url reported
+// by upstream is mismatched with the discovery URL. This is meant for integration
+// with off-spec providers such as Azure.
+//
+//    discoveryBaseURL := "https://login.microsoftonline.com/organizations/v2.0"
+//    issuerURL := "https://login.microsoftonline.com/my-tenantid/v2.0"
+//
+//    ctx := oidc.InsecureIssuerURLContext(parentContext, issuerURL)
+//
+//    // Provider will be discovered with the discoveryBaseURL, but use issuerURL
+//    // for future issuer validation.
+//    provider, err := oidc.NewProvider(ctx, discoveryBaseURL)
+//
+// This is insecure because validating the correct issuer is critical for multi-tenant
+// proivders. Any overrides here MUST be carefully reviewed.
+func InsecureIssuerURLContext(ctx context.Context, issuerURL string) context.Context {
+	return context.WithValue(ctx, issuerURLKey, issuerURL)
 }
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
@@ -142,7 +165,11 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		return nil, fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
 	}
 
-	if p.Issuer != issuer {
+	issuerURL, skipIssuerValidation := ctx.Value(issuerURLKey).(string)
+	if !skipIssuerValidation {
+		issuerURL = issuer
+	}
+	if p.Issuer != issuerURL && !skipIssuerValidation {
 		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
 	}
 	var algs []string
@@ -152,7 +179,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		}
 	}
 	return &Provider{
-		issuer:       p.Issuer,
+		issuer:       issuerURL,
 		authURL:      p.AuthURL,
 		tokenURL:     p.TokenURL,
 		userInfoURL:  p.UserInfoURL,
