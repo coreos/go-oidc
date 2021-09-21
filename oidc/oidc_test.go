@@ -314,9 +314,9 @@ func TestNewProvider(t *testing.T) {
 				t.Errorf("NewProvider() unexpected tokenURL value, got=%s, want=%s",
 					p.tokenURL, test.wantTokenURL)
 			}
-			if p.userInfoURL != test.wantUserInfoURL {
-				t.Errorf("NewProvider() unexpected userInfoURL value, got=%s, want=%s",
-					p.userInfoURL, test.wantUserInfoURL)
+			if p.UserInfoURL != test.wantUserInfoURL {
+				t.Errorf("NewProvider() unexpected UserInfoURL value, got=%s, want=%s",
+					p.UserInfoURL, test.wantUserInfoURL)
 			}
 			if !reflect.DeepEqual(p.algorithms, test.wantAlgorithms) {
 				t.Errorf("NewProvider() unexpected algorithms value, got=%s, want=%s",

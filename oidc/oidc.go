@@ -98,11 +98,12 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer      string
-	authURL     string
-	tokenURL    string
-	userInfoURL string
-	algorithms  []string
+	UserInfoURL string
+
+	issuer     string
+	authURL    string
+	tokenURL   string
+	algorithms []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -182,7 +183,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		issuer:       issuerURL,
 		authURL:      p.AuthURL,
 		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
+		UserInfoURL:  p.UserInfoURL,
 		algorithms:   algs,
 		rawClaims:    body,
 		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
@@ -244,11 +245,11 @@ func (u *UserInfo) Claims(v interface{}) error {
 
 // UserInfo uses the token source to query the provider's user info endpoint.
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource) (*UserInfo, error) {
-	if p.userInfoURL == "" {
+	if p.UserInfoURL == "" {
 		return nil, errors.New("oidc: user info endpoint is not supported by this provider")
 	}
 
-	req, err := http.NewRequest("GET", p.userInfoURL, nil)
+	req, err := http.NewRequest("GET", p.UserInfoURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: create GET request: %v", err)
 	}
