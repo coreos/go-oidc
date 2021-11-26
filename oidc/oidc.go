@@ -98,11 +98,12 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer      string
-	authURL     string
-	tokenURL    string
-	userInfoURL string
-	algorithms  []string
+	issuer        string
+	authURL       string
+	deviceAuthURL string
+	tokenURL      string
+	userInfoURL   string
+	algorithms    []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -111,12 +112,13 @@ type Provider struct {
 }
 
 type providerJSON struct {
-	Issuer      string   `json:"issuer"`
-	AuthURL     string   `json:"authorization_endpoint"`
-	TokenURL    string   `json:"token_endpoint"`
-	JWKSURL     string   `json:"jwks_uri"`
-	UserInfoURL string   `json:"userinfo_endpoint"`
-	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
+	Issuer        string   `json:"issuer"`
+	AuthURL       string   `json:"authorization_endpoint"`
+	DeviceAuthURL string   `json:"device_authorization_endpoint"`
+	TokenURL      string   `json:"token_endpoint"`
+	JWKSURL       string   `json:"jwks_uri"`
+	UserInfoURL   string   `json:"userinfo_endpoint"`
+	Algorithms    []string `json:"id_token_signing_alg_values_supported"`
 }
 
 // supportedAlgorithms is a list of algorithms explicitly supported by this
@@ -179,13 +181,14 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		}
 	}
 	return &Provider{
-		issuer:       issuerURL,
-		authURL:      p.AuthURL,
-		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
-		algorithms:   algs,
-		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
+		issuer:        issuerURL,
+		authURL:       p.AuthURL,
+		deviceAuthURL: p.DeviceAuthURL,
+		tokenURL:      p.TokenURL,
+		userInfoURL:   p.UserInfoURL,
+		algorithms:    algs,
+		rawClaims:     body,
+		remoteKeySet:  NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
 	}, nil
 }
 
@@ -212,6 +215,11 @@ func (p *Provider) Claims(v interface{}) error {
 // Endpoint returns the OAuth2 auth and token endpoints for the given provider.
 func (p *Provider) Endpoint() oauth2.Endpoint {
 	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL}
+}
+
+// DeviceAuthEndpoint returns the OAuth2 device auth and token endpoints for the provider
+func (p *Provider) DeviceAuthEndpoint() oauth2.Endpoint {
+	return oauth2.Endpoint{AuthURL: p.deviceAuthURL, TokenURL: p.tokenURL}
 }
 
 // UserInfo represents the OpenID Connect userinfo claims.
