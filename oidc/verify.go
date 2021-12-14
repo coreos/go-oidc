@@ -100,6 +100,9 @@ type Config struct {
 
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
+
+	// Duration for clock skew. Defaults to 5 minutes.
+	ClockSkew time.Duration
 }
 
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.
@@ -267,18 +270,22 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		}
 		nowTime := now()
 
-		if t.Expiry.Before(nowTime) {
+		// Set to 5 minutes by default since this is what other OpenID Connect providers do to deal with clock skew.
+		// https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/6.12.2/src/Microsoft.IdentityModel.Tokens/TokenValidationParameters.cs#L149-L153
+		clockSkew := 5 * time.Minute
+		if v.config.ClockSkew > 0 {
+			clockSkew = v.config.ClockSkew
+		}
+
+		if t.Expiry.Before(nowTime.Add(-clockSkew)) {
 			return nil, fmt.Errorf("oidc: token is expired (Token Expiry: %v)", t.Expiry)
 		}
 
 		// If nbf claim is provided in token, ensure that it is indeed in the past.
 		if token.NotBefore != nil {
 			nbfTime := time.Time(*token.NotBefore)
-			// Set to 5 minutes since this is what other OpenID Connect providers do to deal with clock skew.
-			// https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/6.12.2/src/Microsoft.IdentityModel.Tokens/TokenValidationParameters.cs#L149-L153
-			leeway := 5 * time.Minute
 
-			if nowTime.Add(leeway).Before(nbfTime) {
+			if nowTime.Add(clockSkew).Before(nbfTime) {
 				return nil, fmt.Errorf("oidc: current time %v before the nbf (not before) time: %v", nowTime, nbfTime)
 			}
 		}
