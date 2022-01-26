@@ -100,6 +100,7 @@ type Provider struct {
 	userInfoURL            string
 	deviceAuthorizationURL string
 	jwksURL                string
+	endSessionURL          string
 	algorithms             []string
 
 	// Raw claims returned by the server.
@@ -136,6 +137,7 @@ type providerJSON struct {
 	UserInfoURL            string   `json:"userinfo_endpoint"`
 	DeviceAuthorizationURL string   `json:"device_authorization_endpoint"`
 	Algorithms             []string `json:"id_token_signing_alg_values_supported"`
+	EndSessionEndpoint     string   `json:"end_session_endpoint"`
 }
 
 // supportedAlgorithms is a list of algorithms explicitly supported by this
@@ -248,6 +250,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		userInfoURL:            p.UserInfoURL,
 		deviceAuthorizationURL: p.DeviceAuthorizationURL,
 		jwksURL:                p.JWKSURL,
+		endSessionURL:          p.EndSessionEndpoint,
 		algorithms:             algs,
 		rawClaims:              body,
 		client:                 getClient(ctx),
@@ -364,6 +367,11 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		EmailVerified: bool(userInfo.EmailVerified),
 		claims:        body,
 	}, nil
+}
+
+// EndSessionURL returns the provider end session endpoint
+func (p *Provider) EndSessionURL() string {
+	return p.endSessionURL
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
