@@ -179,7 +179,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		}
 	}
 	
-	if p.JWSKURL == "" {
+	if p.JWKSURL == "" {
 		return nil, fmt.Errorf("oidc: remote keys urls is empty")
 	}
 
