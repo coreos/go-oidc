@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -102,14 +104,16 @@ func TestAccessTokenVerification(t *testing.T) {
 
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
-		name            string
-		data            string
-		trailingSlash   bool
-		wantAuthURL     string
-		wantTokenURL    string
-		wantUserInfoURL string
-		wantAlgorithms  []string
-		wantErr         bool
+		name              string
+		data              string
+		issuerURLOverride string
+		trailingSlash     bool
+		wantAuthURL       string
+		wantTokenURL      string
+		wantUserInfoURL   string
+		wantIssuerURL     string
+		wantAlgorithms    []string
+		wantErr           bool
 	}{
 		{
 			name: "basic_case",
@@ -162,6 +166,21 @@ func TestNewProvider(t *testing.T) {
 				"id_token_signing_alg_values_supported": ["RS256"]
 			}`,
 			wantErr: true,
+		},
+		{
+			name:              "mismatched_issuer_discovery_override",
+			issuerURLOverride: "https://example.com",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			wantIssuerURL:  "https://example.com",
+			wantAuthURL:    "https://example.com/auth",
+			wantTokenURL:   "https://example.com/token",
+			wantAlgorithms: []string{"RS256"},
 		},
 		{
 			name: "issuer_with_trailing_slash",
@@ -267,6 +286,10 @@ func TestNewProvider(t *testing.T) {
 				issuer += "/"
 			}
 
+			if test.issuerURLOverride != "" {
+				ctx = InsecureIssuerURLContext(ctx, test.issuerURLOverride)
+			}
+
 			p, err := NewProvider(ctx, issuer)
 			if err != nil {
 				if !test.wantErr {
@@ -276,6 +299,11 @@ func TestNewProvider(t *testing.T) {
 			}
 			if test.wantErr {
 				t.Fatalf("NewProvider(): expected error")
+			}
+
+			if test.wantIssuerURL != "" && p.issuer != test.wantIssuerURL {
+				t.Errorf("NewProvider() unexpected issuer value, got=%s, want=%s",
+					p.issuer, test.wantIssuerURL)
 			}
 
 			if p.authURL != test.wantAuthURL {
@@ -296,4 +324,198 @@ func TestNewProvider(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCloneContext(t *testing.T) {
+	ctx := context.Background()
+	if _, ok := cloneContext(ctx).Value(oauth2.HTTPClient).(*http.Client); ok {
+		t.Errorf("cloneContext(): expected no *http.Client from empty context")
+	}
+
+	c := &http.Client{}
+	ctx = ClientContext(ctx, c)
+	if got, ok := cloneContext(ctx).Value(oauth2.HTTPClient).(*http.Client); !ok || c != got {
+		t.Errorf("cloneContext(): expected *http.Client from context")
+	}
+}
+
+type testServer struct {
+	contentType string
+	userInfo    string
+}
+
+func (ts *testServer) run(t *testing.T) string {
+	newMux := http.NewServeMux()
+	server := httptest.NewServer(newMux)
+
+	// generated using mkjwk.org
+	jwks := `{
+		"keys": [
+			{
+				"kty": "RSA",
+				"e": "AQAB",
+				"use": "sig",
+				"kid": "test",
+				"alg": "RS256",
+				"n": "ilhCmTGFjjIPVN7Lfdn_fvpXOlzxa3eWnQGZ_eRa2ibFB1mnqoWxZJ8fkWIVFOQpsn66bIfWjBo_OI3sE6LhhRF8xhsMxlSeRKhpsWg0klYnMBeTWYET69YEAX_rGxy0MCZlFZ5tpr56EVZ-3QLfNiR4hcviqj9F2qE6jopfywsnlulJgyMi3N3kugit_JCNBJ0yz4ndZrMozVOtGqt35HhggUgYROzX6SWHUJdPXSmbAZU-SVLlesQhPfHS8LLq0sACb9OmdcwrpEFdbGCSTUPlHGkN5h6Zy8CS4s_bCdXKkjD20jv37M3GjRQkjE8vyMxFlo_qT8F8VZlSgXYTFw"
+			}
+		]
+	}`
+
+	wellKnown := fmt.Sprintf(`{
+		"issuer": "%[1]s",
+		"authorization_endpoint": "%[1]s/auth",
+		"token_endpoint": "%[1]s/token",
+		"jwks_uri": "%[1]s/keys",
+		"userinfo_endpoint": "%[1]s/userinfo",
+		"id_token_signing_alg_values_supported": ["RS256"]
+	}`, server.URL)
+
+	newMux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, req *http.Request) {
+		_, err := io.WriteString(w, wellKnown)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+	})
+	newMux.HandleFunc("/keys", func(w http.ResponseWriter, req *http.Request) {
+		_, err := io.WriteString(w, jwks)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+	})
+	newMux.HandleFunc("/userinfo", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Add("Content-Type", ts.contentType)
+		_, err := io.WriteString(w, ts.userInfo)
+		if err != nil {
+			w.WriteHeader(500)
+		}
+	})
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+func TestUserInfoEndpoint(t *testing.T) {
+
+	userInfoJSON := `{
+		"sub": "1234567890",
+		"profile": "Joe Doe",
+		"email": "joe@doe.com",
+		"email_verified": true,
+		"is_admin": true
+	}`
+	userInfoJSONCognitoVariant := `{
+		"sub": "1234567890",
+		"profile": "Joe Doe",
+		"email": "joe@doe.com",
+		"email_verified": "true",
+		"is_admin": true
+	}`
+
+	tests := []struct {
+		name         string
+		server       testServer
+		wantUserInfo UserInfo
+	}{
+		{
+			name: "basic json userinfo",
+			server: testServer{
+				contentType: "application/json",
+				userInfo:    userInfoJSON,
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSON),
+			},
+		},
+		{
+			name: "signed jwt userinfo",
+			server: testServer{
+				contentType: "application/jwt",
+				// generated with jwt.io based on the private/public key pair
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.ejzc2IOLtvYp-2n5w3w4SW3rHNG9pOahnwpQCwuIaj7DvO4SxDIzeJmFPMKTJUc-1zi5T42mS4Gs2r18KWhSkk8kqYermRX0VcGEEsH0r2BG5boeza_EjCoJ5-jBPX5ODWGhu2sZIkZl29IbaVSC8jk8qKnqacchiHNmuv_xXjRsAgUsqYftrEQOxqhpfL5KN2qtgeVTczg3ABqs2-SFeEzcgA1TnA9H3AynCPCVUMFgh7xyS8jxx7DN-1vRHBySz5gNbf8z8MNx_XBLfRxxxMF24rDIE8Z2gf1DEAPr4tT38hD8ugKSE84gC3xHJWFWsRLg-Ll6OQqshs82axS00Q",
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSON),
+			},
+		},
+		{
+			name: "signed jwt userinfo, content-type with charset",
+			server: testServer{
+				contentType: "application/jwt; charset=ISO-8859-1",
+				// generated with jwt.io based on the private/public key pair
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImlzX2FkbWluIjp0cnVlfQ.ejzc2IOLtvYp-2n5w3w4SW3rHNG9pOahnwpQCwuIaj7DvO4SxDIzeJmFPMKTJUc-1zi5T42mS4Gs2r18KWhSkk8kqYermRX0VcGEEsH0r2BG5boeza_EjCoJ5-jBPX5ODWGhu2sZIkZl29IbaVSC8jk8qKnqacchiHNmuv_xXjRsAgUsqYftrEQOxqhpfL5KN2qtgeVTczg3ABqs2-SFeEzcgA1TnA9H3AynCPCVUMFgh7xyS8jxx7DN-1vRHBySz5gNbf8z8MNx_XBLfRxxxMF24rDIE8Z2gf1DEAPr4tT38hD8ugKSE84gC3xHJWFWsRLg-Ll6OQqshs82axS00Q",
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSON),
+			},
+		},
+		{
+			name: "basic json userinfo - cognito variant",
+			server: testServer{
+				contentType: "application/json",
+				userInfo:    userInfoJSONCognitoVariant,
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSONCognitoVariant),
+			},
+		},
+		{
+			name: "signed jwt userinfo - cognito variant",
+			server: testServer{
+				contentType: "application/jwt",
+				// generated with jwt.io based on the private/public key pair
+				userInfo: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicHJvZmlsZSI6IkpvZSBEb2UiLCJlbWFpbCI6ImpvZUBkb2UuY29tIiwiZW1haWxfdmVyaWZpZWQiOiJ0cnVlIiwiaXNfYWRtaW4iOnRydWV9.V9j6Q208fnj7E5dhCHnAktqndvelyz6PYxmd2fLzA4ze8N770Tq9KFEE3QSM400GTxiP7tMyvBqnTj2q5Hr6DeRoy0WtLmYlnDfOJCr2qKbrPN0k94Ts9_sXAKEiJSKsTFUBHkrH4NhyWsaBaPamI8ghuqPKJ1LniNuskHUlzBmDDW4mTy15ArsaIno8S4XVn19OoqODIO30axJJxKfxEbsDR3-YW4OD9qn80Wzw0zOsGJ04NJRfO56VSprX0PhqvduOSUuHvm4cxtJIHHvj3AitrQriKZebZpXSs9PXPSPCysiQHyDz0A8y7R-sDgEhJlxe93nVbTU0itBehrbugQ",
+			},
+			wantUserInfo: UserInfo{
+				Subject:       "1234567890",
+				Profile:       "Joe Doe",
+				Email:         "joe@doe.com",
+				EmailVerified: true,
+				claims:        []byte(userInfoJSONCognitoVariant),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			serverURL := test.server.run(t)
+
+			ctx := context.Background()
+
+			provider, err := NewProvider(ctx, serverURL)
+			if err != nil {
+				t.Fatalf("Failed to initialize provider for test %v", err)
+			}
+
+			fakeOauthToken := oauth2.Token{}
+			info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(&fakeOauthToken))
+			if err != nil {
+				t.Fatalf("failed to get userinfo %v", err)
+			}
+
+			if info.Email != test.wantUserInfo.Email {
+				t.Errorf("expected UserInfo to be %v , got %v", test.wantUserInfo, info)
+			}
+
+			if info.EmailVerified != test.wantUserInfo.EmailVerified {
+				t.Errorf("expected UserInfo.EmailVerified to be %v , got %v", test.wantUserInfo.EmailVerified, info.EmailVerified)
+			}
+		})
+	}
+
 }

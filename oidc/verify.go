@@ -171,21 +171,7 @@ func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src
 	return token.claims, nil
 }
 
-func parseClaim(raw []byte, name string, v interface{}) error {
-	var parsed map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return err
-	}
-
-	val, ok := parsed[name]
-	if !ok {
-		return fmt.Errorf("claim doesn't exist: %s", name)
-	}
-
-	return json.Unmarshal([]byte(val), v)
-}
-
-// Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
+// Verify parses a raw ID Token, verifies it's been signed by the provider, performs
 // any additional checks depending on the Config, and returns the payload.
 //
 // Verify does NOT do nonce validation, which is the callers responsibility.
@@ -288,7 +274,9 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		// If nbf claim is provided in token, ensure that it is indeed in the past.
 		if token.NotBefore != nil {
 			nbfTime := time.Time(*token.NotBefore)
-			leeway := 1 * time.Minute
+			// Set to 5 minutes since this is what other OpenID Connect providers do to deal with clock skew.
+			// https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/6.12.2/src/Microsoft.IdentityModel.Tokens/TokenValidationParameters.cs#L149-L153
+			leeway := 5 * time.Minute
 
 			if nowTime.Add(leeway).Before(nbfTime) {
 				return nil, fmt.Errorf("oidc: current time %v before the nbf (not before) time: %v", nowTime, nbfTime)
