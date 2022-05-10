@@ -103,9 +103,6 @@ type Config struct {
 }
 
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.
-//
-// The returned IDTokenVerifier is tied to the Provider's context and its behavior is
-// undefined once the Provider's context is canceled.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
 	if len(config.SupportedSigningAlgs) == 0 && len(p.algorithms) > 0 {
 		// Make a copy so we don't modify the config values.
