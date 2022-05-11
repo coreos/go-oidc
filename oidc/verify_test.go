@@ -2,7 +2,7 @@ package oidc
 
 import (
 	"context"
-	"fmt"
+	"crypto"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,21 +10,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	jose "gopkg.in/square/go-jose.v2"
 )
-
-type testVerifier struct {
-	jwk jose.JSONWebKey
-}
-
-func (t *testVerifier) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
-	jws, err := jose.ParseSigned(jwt)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
-	}
-	return jws.Verify(&t.jwk)
-}
 
 func TestVerify(t *testing.T) {
 	tests := []verificationTest{
@@ -513,9 +499,9 @@ func (v resolverTest) testEndpoint(t *testing.T) ([]byte, error) {
 	issuer := v.issuer
 	var ks KeySet
 	if v.verificationKey == nil {
-		ks = &testVerifier{v.signKey.jwk()}
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.signKey.pub}}
 	} else {
-		ks = &testVerifier{v.verificationKey.jwk()}
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.verificationKey.pub}}
 	}
 	verifier := NewVerifier(issuer, ks, &v.config)
 
@@ -560,9 +546,9 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 	}
 	var ks KeySet
 	if v.verificationKey == nil {
-		ks = &testVerifier{v.signKey.jwk()}
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.signKey.pub}}
 	} else {
-		ks = &testVerifier{v.verificationKey.jwk()}
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.verificationKey.pub}}
 	}
 	verifier := NewVerifier(issuer, ks, &v.config)
 
