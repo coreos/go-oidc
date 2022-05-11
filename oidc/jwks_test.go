@@ -58,7 +58,6 @@ func (s *signingKey) sign(t *testing.T, payload []byte) string {
 	return data
 }
 
-// jwk returns the public part of the signing key.
 func (s *signingKey) jwk() jose.JSONWebKey {
 	return jose.JSONWebKey{Key: s.pub, Use: "sig", Algorithm: string(s.alg), KeyID: s.keyID}
 }

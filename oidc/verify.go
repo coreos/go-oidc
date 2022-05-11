@@ -55,15 +55,10 @@ type IDTokenVerifier struct {
 //		keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
 //		verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 //
-// Since KeySet is an interface, this constructor can also be used to supply custom
-// public key sources. For example, if a user wanted to supply public keys out-of-band
-// and hold them statically in-memory:
+// Or a static key set (e.g. for testing):
 //
-//		// Custom KeySet implementation.
-//		keySet := newStatisKeySet(publicKeys...)
-//
-//		// Verifier uses the custom KeySet implementation.
-//		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
+//		keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub1, pub2}}
+//		verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 //
 func NewVerifier(issuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
 	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL}
