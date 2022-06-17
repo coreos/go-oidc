@@ -459,7 +459,7 @@ type claimSource struct {
 type stringAsBool bool
 
 func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
-	switch string(b) {
+	switch strings.ToLower(string(b)) {
 	case "true", `"true"`:
 		*sb = true
 	case "false", `"false"`:
