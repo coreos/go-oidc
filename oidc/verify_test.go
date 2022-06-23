@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"crypto"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -72,8 +73,8 @@ func TestVerify(t *testing.T) {
 			config: Config{
 				SkipClientIDCheck: true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:   newRSAKey(t),
+			wantErrAs: &TokenExpiredError{},
 		},
 		{
 			name:    "unexpired token",
@@ -530,8 +531,9 @@ type verificationTest struct {
 	// testing invalid signatures.
 	verificationKey *signingKey
 
-	config  Config
-	wantErr bool
+	config    Config
+	wantErr   bool
+	wantErrAs error
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
@@ -557,10 +559,13 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 
 func (v verificationTest) run(t *testing.T) {
 	_, err := v.runGetToken(t)
-	if err != nil && !v.wantErr {
+	if err != nil && !v.wantErr && v.wantErrAs == nil {
 		t.Errorf("%v", err)
 	}
-	if err == nil && v.wantErr {
+	if err == nil && (v.wantErr || v.wantErrAs != nil) {
 		t.Errorf("expected error")
+	}
+	if v.wantErrAs != nil && !errors.As(err, &v.wantErrAs) {
+		t.Errorf("expected error %q but got %q", v.wantErrAs, err)
 	}
 }
