@@ -73,8 +73,8 @@ func TestVerify(t *testing.T) {
 			config: Config{
 				SkipClientIDCheck: true,
 			},
-			signKey:   newRSAKey(t),
-			wantErrAs: &TokenExpiredError{},
+			signKey:       newRSAKey(t),
+			wantErrExpiry: true,
 		},
 		{
 			name:    "unexpired token",
@@ -531,9 +531,9 @@ type verificationTest struct {
 	// testing invalid signatures.
 	verificationKey *signingKey
 
-	config    Config
-	wantErr   bool
-	wantErrAs error
+	config        Config
+	wantErr       bool
+	wantErrExpiry bool
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
@@ -559,13 +559,16 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 
 func (v verificationTest) run(t *testing.T) {
 	_, err := v.runGetToken(t)
-	if err != nil && !v.wantErr && v.wantErrAs == nil {
+	if err != nil && !v.wantErr && !v.wantErrExpiry {
 		t.Errorf("%v", err)
 	}
-	if err == nil && (v.wantErr || v.wantErrAs != nil) {
+	if err == nil && (v.wantErr || v.wantErrExpiry) {
 		t.Errorf("expected error")
 	}
-	if v.wantErrAs != nil && !errors.As(err, &v.wantErrAs) {
-		t.Errorf("expected error %q but got %q", v.wantErrAs, err)
+	if v.wantErrExpiry {
+		var errExp *TokenExpiredError
+		if !errors.As(err, &errExp) {
+			t.Errorf("expected *TokenExpiryError but got %q", err)
+		}
 	}
 }
