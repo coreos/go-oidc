@@ -308,6 +308,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	t.sigAlgorithm = sig.Header.Algorithm
 
+	ctx = context.WithValue(ctx, parsedJWTKey, jws)
 	gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify signature: %v", err)
