@@ -102,6 +102,7 @@ type Provider struct {
 	authURL     string
 	tokenURL    string
 	userInfoURL string
+	logoutURL   string
 	algorithms  []string
 
 	// Raw claims returned by the server.
@@ -116,6 +117,7 @@ type providerJSON struct {
 	TokenURL    string   `json:"token_endpoint"`
 	JWKSURL     string   `json:"jwks_uri"`
 	UserInfoURL string   `json:"userinfo_endpoint"`
+	LogoutURL   string   `json:"end_session_endpoint"`
 	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
 }
 
@@ -152,6 +154,11 @@ type ProviderConfig struct {
 	//
 	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
 	UserInfoURL string
+
+	// LogoutURL is the endpoint used by the provider to support the OpenID
+	// connect end session (logout)
+	LogoutURL string
+
 	// JWKSURL is the endpoint used by the provider to advertise public keys to
 	// verify issued ID tokens. This endpoint is polled as new keys are made
 	// available.
@@ -171,6 +178,7 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 		authURL:      p.AuthURL,
 		tokenURL:     p.TokenURL,
 		userInfoURL:  p.UserInfoURL,
+		logoutURL:    p.LogoutURL,
 		algorithms:   p.Algorithms,
 		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
 	}
@@ -225,6 +233,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		authURL:      p.AuthURL,
 		tokenURL:     p.TokenURL,
 		userInfoURL:  p.UserInfoURL,
+		logoutURL:    p.LogoutURL,
 		algorithms:   algs,
 		rawClaims:    body,
 		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
@@ -335,6 +344,14 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		EmailVerified: bool(userInfo.EmailVerified),
 		claims:        body,
 	}, nil
+}
+
+func (p *Provider) GetLogoutUrl() string {
+	if p != nil {
+		return p.logoutURL
+	}
+
+	return ""
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
