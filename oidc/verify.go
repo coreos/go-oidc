@@ -107,6 +107,17 @@ type Config struct {
 
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
+
+	// InsecureSkipSignatureCheck causes this package to skip JWT signature validation.
+	// It's intended for special cases where providers (such as Azure), use the "none"
+	// algorithm.
+	//
+	// This option can only be enabled safely when the ID Token is received directly
+	// from the provider after the token exchange.
+	//
+	// This option MUST NOT be used when receiving an ID Token from sources other
+	// than the token endpoint.
+	InsecureSkipSignatureCheck bool
 }
 
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.
@@ -196,11 +207,6 @@ func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src
 //    token, err := verifier.Verify(ctx, rawIDToken)
 //
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
-	jws, err := jose.ParseSigned(rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
-	}
-
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
 	// us do cheap checks before possibly re-syncing keys.
 	payload, err := parseJWT(rawIDToken)
@@ -286,6 +292,15 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 				return nil, fmt.Errorf("oidc: current time %v before the nbf (not before) time: %v", nowTime, nbfTime)
 			}
 		}
+	}
+
+	if v.config.InsecureSkipSignatureCheck {
+		return t, nil
+	}
+
+	jws, err := jose.ParseSigned(rawIDToken)
+	if err != nil {
+		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
 
 	switch len(jws.Signatures) {

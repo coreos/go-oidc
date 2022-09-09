@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"crypto"
+	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
@@ -121,6 +122,24 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
+		},
+		{
+			name:    "unsigned token",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+			},
+			wantErr: true,
+		},
+		{
+			name:    "unsigned token InsecureSkipSignatureCheck",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck:          true,
+				SkipExpiryCheck:            true,
+				InsecureSkipSignatureCheck: true,
+			},
 		},
 	}
 	for _, test := range tests {
@@ -537,7 +556,14 @@ type verificationTest struct {
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
-	token := v.signKey.sign(t, []byte(v.idToken))
+	var token string
+	if v.signKey != nil {
+		token = v.signKey.sign(t, []byte(v.idToken))
+	} else {
+		token = base64.RawURLEncoding.EncodeToString([]byte(`{alg: "none"}`))
+		token += "."
+		token += base64.RawURLEncoding.EncodeToString([]byte(v.idToken))
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -547,10 +573,10 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 		issuer = v.issuer
 	}
 	var ks KeySet
-	if v.verificationKey == nil {
-		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.signKey.pub}}
-	} else {
+	if v.verificationKey != nil {
 		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.verificationKey.pub}}
+	} else if v.signKey != nil {
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.signKey.pub}}
 	}
 	verifier := NewVerifier(issuer, ks, &v.config)
 
