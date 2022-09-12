@@ -129,6 +129,19 @@ func TestNewProvider(t *testing.T) {
 			wantAlgorithms: []string{"RS256"},
 		},
 		{
+			name: "additional_useless_slash",
+			data: `{
+				"issuer": "ISSUER/",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			wantAuthURL:    "https://example.com/auth",
+			wantTokenURL:   "https://example.com/token",
+			wantAlgorithms: []string{"RS256"},
+		},
+		{
 			name: "additional_algorithms",
 			data: `{
 				"issuer": "ISSUER",
