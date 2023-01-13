@@ -120,8 +120,22 @@ type Config struct {
 	InsecureSkipSignatureCheck bool
 }
 
+// VerifierContext returns an IDTokenVerifier that uses the provider's key set to
+// verify JWTs. As opposed to Verifier, the context is used for all requests to
+// the upstream JWKs endpoint.
+func (p *Provider) VerifierContext(ctx context.Context, config *Config) *IDTokenVerifier {
+	return p.newVerifier(NewRemoteKeySet(ctx, p.jwksURL), config)
+}
+
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.
+//
+// The returned verifier uses a background context for all requests to the upstream
+// JWKs endpoint. To control that context, use VerifierContext instead.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
+	return p.newVerifier(p.remoteKeySet(), config)
+}
+
+func (p *Provider) newVerifier(keySet KeySet, config *Config) *IDTokenVerifier {
 	if len(config.SupportedSigningAlgs) == 0 && len(p.algorithms) > 0 {
 		// Make a copy so we don't modify the config values.
 		cp := &Config{}
@@ -129,7 +143,7 @@ func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
 		cp.SupportedSigningAlgs = p.algorithms
 		config = cp
 	}
-	return NewVerifier(p.issuer, p.remoteKeySet, config)
+	return NewVerifier(p.issuer, keySet, config)
 }
 
 func parseJWT(p string) ([]byte, error) {
