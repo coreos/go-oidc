@@ -326,15 +326,15 @@ func TestNewProvider(t *testing.T) {
 	}
 }
 
-func TestCloneContext(t *testing.T) {
+func TestGetClient(t *testing.T) {
 	ctx := context.Background()
-	if _, ok := cloneContext(ctx).Value(oauth2.HTTPClient).(*http.Client); ok {
+	if c := getClient(ctx); c != nil {
 		t.Errorf("cloneContext(): expected no *http.Client from empty context")
 	}
 
 	c := &http.Client{}
 	ctx = ClientContext(ctx, c)
-	if got, ok := cloneContext(ctx).Value(oauth2.HTTPClient).(*http.Client); !ok || c != got {
+	if got := getClient(ctx); got == nil || c != got {
 		t.Errorf("cloneContext(): expected *http.Client from context")
 	}
 }

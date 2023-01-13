@@ -60,7 +60,7 @@ func newRemoteKeySet(ctx context.Context, jwksURL string, now func() time.Time) 
 	if now == nil {
 		now = time.Now
 	}
-	return &RemoteKeySet{jwksURL: jwksURL, ctx: cloneContext(ctx), now: now}
+	return &RemoteKeySet{jwksURL: jwksURL, ctx: ctx, now: now}
 }
 
 // RemoteKeySet is a KeySet implementation that validates JSON web tokens against
