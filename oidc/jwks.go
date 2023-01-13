@@ -219,7 +219,7 @@ func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 }
 
 func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
-	req, err := http.NewRequest("GET", r.jwksURL, nil)
+	req, err := http.NewRequestWithContext(r.ctx, "GET", r.jwksURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: can't create request: %v", err)
 	}

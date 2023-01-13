@@ -155,7 +155,7 @@ func contains(sli []string, ele string) bool {
 
 // Returns the Claims from the distributed JWT token
 func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src claimSource) ([]byte, error) {
-	req, err := http.NewRequest("GET", src.Endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", src.Endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("malformed request: %v", err)
 	}
