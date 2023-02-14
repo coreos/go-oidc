@@ -8,13 +8,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
-	jose "gopkg.in/square/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v3"
 )
 
 type keyServer struct {
@@ -39,7 +40,7 @@ type signingKey struct {
 }
 
 // sign creates a JWS using the private key from the provided payload.
-func (s *signingKey) sign(t *testing.T, payload []byte) string {
+func (s *signingKey) sign(t testing.TB, payload []byte) string {
 	privKey := &jose.JSONWebKey{Key: s.priv, Algorithm: string(s.alg), KeyID: s.keyID}
 
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: s.alg, Key: privKey}, nil)
@@ -58,12 +59,11 @@ func (s *signingKey) sign(t *testing.T, payload []byte) string {
 	return data
 }
 
-// jwk returns the public part of the signing key.
 func (s *signingKey) jwk() jose.JSONWebKey {
 	return jose.JSONWebKey{Key: s.pub, Use: "sig", Algorithm: string(s.alg), KeyID: s.keyID}
 }
 
-func newRSAKey(t *testing.T) *signingKey {
+func newRSAKey(t testing.TB) *signingKey {
 	priv, err := rsa.GenerateKey(rand.Reader, 1028)
 	if err != nil {
 		t.Fatal(err)
@@ -235,5 +235,48 @@ func TestRotation(t *testing.T) {
 	}
 	if _, err := rks.verify(ctx, jws2); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
+	}
+}
+
+func BenchmarkVerify(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	key := newRSAKey(b)
+
+	now := time.Date(2022, 01, 29, 0, 0, 0, 0, time.UTC)
+	exp := now.Add(time.Hour)
+	payload := []byte(fmt.Sprintf(`{
+		"iss": "https://example.com",
+		"sub": "test_user",
+		"aud": "test_client_id",
+		"exp": %d
+	}`, exp.Unix()))
+
+	idToken := key.sign(b, payload)
+	server := &keyServer{
+		keys: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{key.jwk()},
+		},
+	}
+	s := httptest.NewServer(server)
+	defer s.Close()
+
+	rks := NewRemoteKeySet(ctx, s.URL)
+	verifier := NewVerifier("https://example.com", rks, &Config{
+		ClientID: "test_client_id",
+		Now:      func() time.Time { return now },
+	})
+
+	// Trigger the remote key set to query the public keys and cache them.
+	if _, err := verifier.Verify(ctx, idToken); err != nil {
+		b.Fatalf("verifying id token: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := verifier.Verify(ctx, idToken); err != nil {
+			b.Fatalf("verifying id token: %v", err)
+		}
 	}
 }

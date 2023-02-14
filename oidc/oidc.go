@@ -14,6 +14,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -58,15 +59,11 @@ func ClientContext(ctx context.Context, client *http.Client) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
 }
 
-// cloneContext copies a context's bag-of-values into a new context that isn't
-// associated with its cancellation. This is used to initialize remote keys sets
-// which run in the background and aren't associated with the initial context.
-func cloneContext(ctx context.Context) context.Context {
-	cp := context.Background()
+func getClient(ctx context.Context) *http.Client {
 	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
-		cp = ClientContext(cp, c)
+		return c
 	}
-	return cp
+	return nil
 }
 
 // InsecureIssuerURLContext allows discovery to work when the issuer_url reported
@@ -90,7 +87,7 @@ func InsecureIssuerURLContext(ctx context.Context, issuerURL string) context.Con
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	client := http.DefaultClient
-	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
+	if c := getClient(ctx); c != nil {
 		client = c
 	}
 	return client.Do(req.WithContext(ctx))
@@ -102,12 +99,33 @@ type Provider struct {
 	authURL     string
 	tokenURL    string
 	userInfoURL string
+	jwksURL     string
 	algorithms  []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
 
-	remoteKeySet KeySet
+	// Guards all of the following fields.
+	mu sync.Mutex
+	// HTTP client specified from the initial NewProvider request. This is used
+	// when creating the common key set.
+	client *http.Client
+	// A key set that uses context.Background() and is shared between all code paths
+	// that don't have a convinent way of supplying a unique context.
+	commonRemoteKeySet KeySet
+}
+
+func (p *Provider) remoteKeySet() KeySet {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.commonRemoteKeySet == nil {
+		ctx := context.Background()
+		if p.client != nil {
+			ctx = ClientContext(ctx, p.client)
+		}
+		p.commonRemoteKeySet = NewRemoteKeySet(ctx, p.jwksURL)
+	}
+	return p.commonRemoteKeySet
 }
 
 type providerJSON struct {
@@ -132,6 +150,49 @@ var supportedAlgorithms = map[string]bool{
 	PS256: true,
 	PS384: true,
 	PS512: true,
+}
+
+// ProviderConfig allows creating providers when discovery isn't supported. It's
+// generally easier to use NewProvider directly.
+type ProviderConfig struct {
+	// IssuerURL is the identity of the provider, and the string it uses to sign
+	// ID tokens with. For example "https://accounts.google.com". This value MUST
+	// match ID tokens exactly.
+	IssuerURL string
+	// AuthURL is the endpoint used by the provider to support the OAuth 2.0
+	// authorization endpoint.
+	AuthURL string
+	// TokenURL is the endpoint used by the provider to support the OAuth 2.0
+	// token endpoint.
+	TokenURL string
+	// UserInfoURL is the endpoint used by the provider to support the OpenID
+	// Connect UserInfo flow.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
+	UserInfoURL string
+	// JWKSURL is the endpoint used by the provider to advertise public keys to
+	// verify issued ID tokens. This endpoint is polled as new keys are made
+	// available.
+	JWKSURL string
+
+	// Algorithms, if provided, indicate a list of JWT algorithms allowed to sign
+	// ID tokens. If not provided, this defaults to the algorithms advertised by
+	// the JWK endpoint, then the set of algorithms supported by this package.
+	Algorithms []string
+}
+
+// NewProvider initializes a provider from a set of endpoints, rather than
+// through discovery.
+func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
+	return &Provider{
+		issuer:      p.IssuerURL,
+		authURL:     p.AuthURL,
+		tokenURL:    p.TokenURL,
+		userInfoURL: p.UserInfoURL,
+		jwksURL:     p.JWKSURL,
+		algorithms:  p.Algorithms,
+		client:      getClient(ctx),
+	}
 }
 
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
@@ -179,13 +240,14 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		}
 	}
 	return &Provider{
-		issuer:       issuerURL,
-		authURL:      p.AuthURL,
-		tokenURL:     p.TokenURL,
-		userInfoURL:  p.UserInfoURL,
-		algorithms:   algs,
-		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
+		issuer:      issuerURL,
+		authURL:     p.AuthURL,
+		tokenURL:    p.TokenURL,
+		userInfoURL: p.UserInfoURL,
+		jwksURL:     p.JWKSURL,
+		algorithms:  algs,
+		rawClaims:   body,
+		client:      getClient(ctx),
 	}, nil
 }
 
@@ -275,7 +337,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	ct := resp.Header.Get("Content-Type")
 	mediaType, _, parseErr := mime.ParseMediaType(ct)
 	if parseErr == nil && mediaType == "application/jwt" {
-		payload, err := p.remoteKeySet.VerifySignature(ctx, string(body))
+		payload, err := p.remoteKeySet().VerifySignature(ctx, string(body))
 		if err != nil {
 			return nil, fmt.Errorf("oidc: invalid userinfo jwt signature %v", err)
 		}

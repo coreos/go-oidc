@@ -2,7 +2,9 @@ package oidc
 
 import (
 	"context"
-	"fmt"
+	"crypto"
+	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,21 +12,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	jose "gopkg.in/square/go-jose.v2"
 )
-
-type testVerifier struct {
-	jwk jose.JSONWebKey
-}
-
-func (t *testVerifier) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
-	jws, err := jose.ParseSigned(jwt)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
-	}
-	return jws.Verify(&t.jwk)
-}
 
 func TestVerify(t *testing.T) {
 	tests := []verificationTest{
@@ -86,8 +74,8 @@ func TestVerify(t *testing.T) {
 			config: Config{
 				SkipClientIDCheck: true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:       newRSAKey(t),
+			wantErrExpiry: true,
 		},
 		{
 			name:    "unexpired token",
@@ -134,6 +122,24 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
+		},
+		{
+			name:    "unsigned token",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+			},
+			wantErr: true,
+		},
+		{
+			name:    "unsigned token InsecureSkipSignatureCheck",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck:          true,
+				SkipExpiryCheck:            true,
+				InsecureSkipSignatureCheck: true,
+			},
 		},
 	}
 	for _, test := range tests {
@@ -513,9 +519,9 @@ func (v resolverTest) testEndpoint(t *testing.T) ([]byte, error) {
 	issuer := v.issuer
 	var ks KeySet
 	if v.verificationKey == nil {
-		ks = &testVerifier{v.signKey.jwk()}
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.signKey.pub}}
 	} else {
-		ks = &testVerifier{v.verificationKey.jwk()}
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.verificationKey.pub}}
 	}
 	verifier := NewVerifier(issuer, ks, &v.config)
 
@@ -544,12 +550,20 @@ type verificationTest struct {
 	// testing invalid signatures.
 	verificationKey *signingKey
 
-	config  Config
-	wantErr bool
+	config        Config
+	wantErr       bool
+	wantErrExpiry bool
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
-	token := v.signKey.sign(t, []byte(v.idToken))
+	var token string
+	if v.signKey != nil {
+		token = v.signKey.sign(t, []byte(v.idToken))
+	} else {
+		token = base64.RawURLEncoding.EncodeToString([]byte(`{alg: "none"}`))
+		token += "."
+		token += base64.RawURLEncoding.EncodeToString([]byte(v.idToken))
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -559,10 +573,10 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 		issuer = v.issuer
 	}
 	var ks KeySet
-	if v.verificationKey == nil {
-		ks = &testVerifier{v.signKey.jwk()}
-	} else {
-		ks = &testVerifier{v.verificationKey.jwk()}
+	if v.verificationKey != nil {
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.verificationKey.pub}}
+	} else if v.signKey != nil {
+		ks = &StaticKeySet{PublicKeys: []crypto.PublicKey{v.signKey.pub}}
 	}
 	verifier := NewVerifier(issuer, ks, &v.config)
 
@@ -571,10 +585,16 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 
 func (v verificationTest) run(t *testing.T) {
 	_, err := v.runGetToken(t)
-	if err != nil && !v.wantErr {
+	if err != nil && !v.wantErr && !v.wantErrExpiry {
 		t.Errorf("%v", err)
 	}
-	if err == nil && v.wantErr {
+	if err == nil && (v.wantErr || v.wantErrExpiry) {
 		t.Errorf("expected error")
+	}
+	if v.wantErrExpiry {
+		var errExp *TokenExpiredError
+		if !errors.As(err, &errExp) {
+			t.Errorf("expected *TokenExpiryError but got %q", err)
+		}
 	}
 }
