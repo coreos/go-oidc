@@ -244,9 +244,8 @@ func testSignedKeyVerify(t *testing.T, signKeyGood *signingKey, signKeyBad *sign
 		t.Errorf("incorrectly verified signature")
 	}
 
-	rks = newRemoteKeySet(ctx, s.URL, signKeyBad.pub, nil)
-
 	// Ensure the token does not verify with bad sign
+	rks = newRemoteKeySet(ctx, s.URL, signKeyBad.pub, nil)
 	gotPayload, err = rks.verify(ctx, jws)
 	if !errors.Is(err, jose.ErrCryptoFailure) {
 		t.Fatal(err)
