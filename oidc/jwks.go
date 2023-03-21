@@ -54,7 +54,13 @@ func (s *StaticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 //
 // The returned KeySet is a long lived verifier that caches keys based on any
 // keys change. Reuse a common remote key set instead of creating new ones as needed.
-func NewRemoteKeySet(ctx context.Context, jwksURL string, jwksSigningKey crypto.PublicKey) *RemoteKeySet {
+func NewRemoteKeySet(ctx context.Context, jwksURL string) *RemoteKeySet {
+	return newRemoteKeySet(ctx, jwksURL, nil, time.Now)
+}
+
+// NewSignedRemoteKeySet supports JWKs wrapped inside JWT as described in
+// https://openid.net/specs/openid-connect-federation-1_0.html#name-openid-connect-and-oauth2-m
+func NewSignedRemoteKeySet(ctx context.Context, jwksURL string, jwksSigningKey crypto.PublicKey) *RemoteKeySet {
 	return newRemoteKeySet(ctx, jwksURL, jwksSigningKey, time.Now)
 }
 
@@ -224,18 +230,18 @@ func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: can't create request: %v", err)
+		return nil, fmt.Errorf("oidc: can't create request: %w", err)
 	}
 
 	resp, err := doRequest(r.ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: get keys failed %v", err)
+		return nil, fmt.Errorf("oidc: get keys failed %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read response body: %v", err)
+		return nil, fmt.Errorf("unable to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

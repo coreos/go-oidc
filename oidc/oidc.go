@@ -124,7 +124,7 @@ func (p *Provider) remoteKeySet() KeySet {
 		if p.client != nil {
 			ctx = ClientContext(ctx, p.client)
 		}
-		p.commonRemoteKeySet = NewRemoteKeySet(ctx, p.jwksURL, p.jwksSigningKey)
+		p.commonRemoteKeySet = NewSignedRemoteKeySet(ctx, p.jwksURL, p.jwksSigningKey)
 	}
 	return p.commonRemoteKeySet
 }

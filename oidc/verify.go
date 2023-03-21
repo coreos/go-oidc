@@ -123,7 +123,7 @@ type Config struct {
 // verify JWTs. As opposed to Verifier, the context is used for all requests to
 // the upstream JWKs endpoint.
 func (p *Provider) VerifierContext(ctx context.Context, config *Config) *IDTokenVerifier {
-	return p.newVerifier(NewRemoteKeySet(ctx, p.jwksURL, p.jwksSigningKey), config)
+	return p.newVerifier(NewSignedRemoteKeySet(ctx, p.jwksURL, p.jwksSigningKey), config)
 }
 
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.

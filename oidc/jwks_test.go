@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -247,7 +248,7 @@ func testSignedKeyVerify(t *testing.T, signKeyGood *signingKey, signKeyBad *sign
 
 	// Ensure the token does not verify with bad sign
 	gotPayload, err = rks.verify(ctx, jws)
-	if err == nil {
+	if !errors.Is(err, jose.ErrCryptoFailure) {
 		t.Fatal(err)
 	}
 	if len(gotPayload) != 0 {
@@ -345,7 +346,7 @@ func BenchmarkVerify(b *testing.B) {
 	s := httptest.NewServer(server)
 	defer s.Close()
 
-	rks := NewRemoteKeySet(ctx, s.URL, nil)
+	rks := NewRemoteKeySet(ctx, s.URL)
 	verifier := NewVerifier("https://example.com", rks, &Config{
 		ClientID: "test_client_id",
 		Now:      func() time.Time { return now },
