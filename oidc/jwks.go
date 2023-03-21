@@ -5,9 +5,11 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"sync"
 	"time"
@@ -52,23 +54,24 @@ func (s *StaticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 //
 // The returned KeySet is a long lived verifier that caches keys based on any
 // keys change. Reuse a common remote key set instead of creating new ones as needed.
-func NewRemoteKeySet(ctx context.Context, jwksURL string) *RemoteKeySet {
-	return newRemoteKeySet(ctx, jwksURL, time.Now)
+func NewRemoteKeySet(ctx context.Context, jwksURL string, jwksSigningKey crypto.PublicKey) *RemoteKeySet {
+	return newRemoteKeySet(ctx, jwksURL, jwksSigningKey, time.Now)
 }
 
-func newRemoteKeySet(ctx context.Context, jwksURL string, now func() time.Time) *RemoteKeySet {
+func newRemoteKeySet(ctx context.Context, jwksURL string, jwksSigningKey crypto.PublicKey, now func() time.Time) *RemoteKeySet {
 	if now == nil {
 		now = time.Now
 	}
-	return &RemoteKeySet{jwksURL: jwksURL, ctx: ctx, now: now}
+	return &RemoteKeySet{jwksURL: jwksURL, jwksSigningKey: jwksSigningKey, ctx: ctx, now: now}
 }
 
 // RemoteKeySet is a KeySet implementation that validates JSON web tokens against
 // a jwks_uri endpoint.
 type RemoteKeySet struct {
-	jwksURL string
-	ctx     context.Context
-	now     func() time.Time
+	jwksURL        string
+	jwksSigningKey crypto.PublicKey
+	ctx            context.Context
+	now            func() time.Time
 
 	// guard all other fields
 	mu sync.RWMutex
@@ -157,7 +160,7 @@ func (r *RemoteKeySet) verify(ctx context.Context, jws *jose.JSONWebSignature) (
 	// https://openid.net/specs/openid-connect-core-1_0.html#RotateSigKeys
 	keys, err := r.keysFromRemote(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("fetching keys %v", err)
+		return nil, fmt.Errorf("fetching keys %w", err)
 	}
 
 	for _, key := range keys {
@@ -239,10 +242,34 @@ func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 		return nil, fmt.Errorf("oidc: get keys failed: %s %s", resp.Status, body)
 	}
 
-	var keySet jose.JSONWebKeySet
-	err = unmarshalResp(resp, body, &keySet)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: failed to decode keys: %v %s", err, body)
+	ct := resp.Header.Get("Content-Type")
+	mediaType, _, parseErr := mime.ParseMediaType(ct)
+	if parseErr != nil {
+		return nil, fmt.Errorf("could not parse Content-Type: %w", err)
 	}
+
+	// response is signed JWT, verify it and assign json to body
+	if mediaType == "application/jwk-set+jwt" {
+		if r.jwksSigningKey == nil {
+			return nil, errors.New("no jwks signing key provided")
+		}
+
+		receivedJwt, err := jose.ParseSigned(string(body))
+		if err != nil {
+			return nil, err
+		}
+
+		body, err = receivedJwt.Verify(r.jwksSigningKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var keySet jose.JSONWebKeySet
+	err = json.Unmarshal(body, &keySet)
+	if err != nil {
+		return nil, fmt.Errorf("oidc: failed to decode keys: %w (body: %s)", err, body)
+	}
+
 	return keySet.Keys, nil
 }

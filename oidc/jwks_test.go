@@ -21,12 +21,21 @@ import (
 type keyServer struct {
 	keys       jose.JSONWebKeySet
 	setHeaders func(h http.Header)
+	signedKeys []byte
 }
 
 func (k *keyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if k.setHeaders != nil {
 		k.setHeaders(w.Header())
 	}
+
+	if k.signedKeys != nil {
+		w.Header().Set("content-type", "application/jwk-set+jwt")
+		w.Write(k.signedKeys)
+		return
+	}
+	w.Header().Set("content-type", "application/json")
+
 	if err := json.NewEncoder(w).Encode(k.keys); err != nil {
 		panic(err)
 	}
@@ -84,6 +93,15 @@ func TestRSAVerify(t *testing.T) {
 	bad := newRSAKey(t)
 
 	testKeyVerify(t, good, bad, good)
+}
+
+func TestJWTKeySet(t *testing.T) {
+	good := newRSAKey(t)
+	bad := newRSAKey(t)
+
+	sk := newRSAKey(t)
+	badSk := newRSAKey(t)
+	testSignedKeyVerify(t, sk, badSk, good, bad, good)
 }
 
 func TestECDSAVerify(t *testing.T) {
@@ -146,7 +164,7 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 	s := httptest.NewServer(&keyServer{keys: keySet})
 	defer s.Close()
 
-	rks := newRemoteKeySet(ctx, s.URL, nil)
+	rks := newRemoteKeySet(ctx, s.URL, nil, nil)
 
 	// Ensure the token verifies.
 	gotPayload, err := rks.verify(ctx, jws)
@@ -169,6 +187,71 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 	// Ensure item signed by wrong token doesn't verify.
 	if _, err := rks.verify(context.Background(), badJWS); err == nil {
 		t.Errorf("incorrectly verified signature")
+	}
+}
+
+func testSignedKeyVerify(t *testing.T, signKeyGood *signingKey, signKeyBad *signingKey, good, bad *signingKey, verification ...*signingKey) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	keySet := jose.JSONWebKeySet{}
+	for _, v := range verification {
+		keySet.Keys = append(keySet.Keys, v.jwk())
+	}
+
+	payload := []byte("a secret")
+
+	jws, err := jose.ParseSigned(good.sign(t, payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	badJWS, err := jose.ParseSigned(bad.sign(t, payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyPayload, err := json.Marshal(keySet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedPayload := signKeyGood.sign(t, keyPayload)
+	s := httptest.NewServer(&keyServer{signedKeys: []byte(signedPayload)})
+	defer s.Close()
+
+	rks := newRemoteKeySet(ctx, s.URL, signKeyGood.pub, nil)
+
+	// Ensure the token verifies.
+	gotPayload, err := rks.verify(ctx, jws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotPayload, payload) {
+		t.Errorf("expected payload %s got %s", payload, gotPayload)
+	}
+
+	// Ensure the token verifies from the cache.
+	gotPayload, err = rks.verify(ctx, jws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotPayload, payload) {
+		t.Errorf("expected payload %s got %s", payload, gotPayload)
+	}
+
+	// Ensure item signed by wrong token doesn't verify.
+	if _, err := rks.verify(context.Background(), badJWS); err == nil {
+		t.Errorf("incorrectly verified signature")
+	}
+
+	rks = newRemoteKeySet(ctx, s.URL, signKeyBad.pub, nil)
+
+	// Ensure the token does not verify with bad sign
+	gotPayload, err = rks.verify(ctx, jws)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if len(gotPayload) != 0 {
+		t.Errorf("expected empty payload got %s", gotPayload)
 	}
 }
 
@@ -206,7 +289,7 @@ func TestRotation(t *testing.T) {
 	s := httptest.NewServer(server)
 	defer s.Close()
 
-	rks := newRemoteKeySet(ctx, s.URL, func() time.Time { return now })
+	rks := newRemoteKeySet(ctx, s.URL, nil, func() time.Time { return now })
 
 	if _, err := rks.verify(ctx, jws1); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
@@ -262,7 +345,7 @@ func BenchmarkVerify(b *testing.B) {
 	s := httptest.NewServer(server)
 	defer s.Close()
 
-	rks := NewRemoteKeySet(ctx, s.URL)
+	rks := NewRemoteKeySet(ctx, s.URL, nil)
 	verifier := NewVerifier("https://example.com", rks, &Config{
 		ClientID: "test_client_id",
 		Now:      func() time.Time { return now },

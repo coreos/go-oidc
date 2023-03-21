@@ -3,6 +3,7 @@ package oidc
 
 import (
 	"context"
+	"crypto"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -49,12 +50,11 @@ var issuerURLKey contextKey
 // This method sets the same context key used by the golang.org/x/oauth2 package,
 // so the returned context works for that package too.
 //
-//    myClient := &http.Client{}
-//    ctx := oidc.ClientContext(parentContext, myClient)
+//	myClient := &http.Client{}
+//	ctx := oidc.ClientContext(parentContext, myClient)
 //
-//    // This will use the custom client
-//    provider, err := oidc.NewProvider(ctx, "https://accounts.example.com")
-//
+//	// This will use the custom client
+//	provider, err := oidc.NewProvider(ctx, "https://accounts.example.com")
 func ClientContext(ctx context.Context, client *http.Client) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
 }
@@ -70,14 +70,14 @@ func getClient(ctx context.Context) *http.Client {
 // by upstream is mismatched with the discovery URL. This is meant for integration
 // with off-spec providers such as Azure.
 //
-//    discoveryBaseURL := "https://login.microsoftonline.com/organizations/v2.0"
-//    issuerURL := "https://login.microsoftonline.com/my-tenantid/v2.0"
+//	discoveryBaseURL := "https://login.microsoftonline.com/organizations/v2.0"
+//	issuerURL := "https://login.microsoftonline.com/my-tenantid/v2.0"
 //
-//    ctx := oidc.InsecureIssuerURLContext(parentContext, issuerURL)
+//	ctx := oidc.InsecureIssuerURLContext(parentContext, issuerURL)
 //
-//    // Provider will be discovered with the discoveryBaseURL, but use issuerURL
-//    // for future issuer validation.
-//    provider, err := oidc.NewProvider(ctx, discoveryBaseURL)
+//	// Provider will be discovered with the discoveryBaseURL, but use issuerURL
+//	// for future issuer validation.
+//	provider, err := oidc.NewProvider(ctx, discoveryBaseURL)
 //
 // This is insecure because validating the correct issuer is critical for multi-tenant
 // proivders. Any overrides here MUST be carefully reviewed.
@@ -95,12 +95,13 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer      string
-	authURL     string
-	tokenURL    string
-	userInfoURL string
-	jwksURL     string
-	algorithms  []string
+	issuer         string
+	authURL        string
+	tokenURL       string
+	userInfoURL    string
+	jwksURL        string
+	jwksSigningKey crypto.PublicKey
+	algorithms     []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -123,7 +124,7 @@ func (p *Provider) remoteKeySet() KeySet {
 		if p.client != nil {
 			ctx = ClientContext(ctx, p.client)
 		}
-		p.commonRemoteKeySet = NewRemoteKeySet(ctx, p.jwksURL)
+		p.commonRemoteKeySet = NewRemoteKeySet(ctx, p.jwksURL, p.jwksSigningKey)
 	}
 	return p.commonRemoteKeySet
 }
@@ -174,6 +175,8 @@ type ProviderConfig struct {
 	// verify issued ID tokens. This endpoint is polled as new keys are made
 	// available.
 	JWKSURL string
+	// JWKSSigningKey is a public key which is used to verify JWKs Can be nil.
+	JWKSSigningKey crypto.PublicKey
 
 	// Algorithms, if provided, indicate a list of JWT algorithms allowed to sign
 	// ID tokens. If not provided, this defaults to the algorithms advertised by
@@ -185,13 +188,14 @@ type ProviderConfig struct {
 // through discovery.
 func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 	return &Provider{
-		issuer:      p.IssuerURL,
-		authURL:     p.AuthURL,
-		tokenURL:    p.TokenURL,
-		userInfoURL: p.UserInfoURL,
-		jwksURL:     p.JWKSURL,
-		algorithms:  p.Algorithms,
-		client:      getClient(ctx),
+		issuer:         p.IssuerURL,
+		authURL:        p.AuthURL,
+		tokenURL:       p.TokenURL,
+		userInfoURL:    p.UserInfoURL,
+		jwksURL:        p.JWKSURL,
+		jwksSigningKey: p.JWKSSigningKey,
+		algorithms:     p.Algorithms,
+		client:         getClient(ctx),
 	}
 }
 
@@ -253,14 +257,14 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 
 // Claims unmarshals raw fields returned by the server during discovery.
 //
-//    var claims struct {
-//        ScopesSupported []string `json:"scopes_supported"`
-//        ClaimsSupported []string `json:"claims_supported"`
-//    }
+//	var claims struct {
+//	    ScopesSupported []string `json:"scopes_supported"`
+//	    ClaimsSupported []string `json:"claims_supported"`
+//	}
 //
-//    if err := provider.Claims(&claims); err != nil {
-//        // handle unmarshaling error
-//    }
+//	if err := provider.Claims(&claims); err != nil {
+//	    // handle unmarshaling error
+//	}
 //
 // For a list of fields defined by the OpenID Connect spec see:
 // https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
@@ -411,18 +415,17 @@ type IDToken struct {
 
 // Claims unmarshals the raw JSON payload of the ID Token into a provided struct.
 //
-//		idToken, err := idTokenVerifier.Verify(rawIDToken)
-//		if err != nil {
-//			// handle error
-//		}
-//		var claims struct {
-//			Email         string `json:"email"`
-//			EmailVerified bool   `json:"email_verified"`
-//		}
-//		if err := idToken.Claims(&claims); err != nil {
-//			// handle error
-//		}
-//
+//	idToken, err := idTokenVerifier.Verify(rawIDToken)
+//	if err != nil {
+//		// handle error
+//	}
+//	var claims struct {
+//		Email         string `json:"email"`
+//		EmailVerified bool   `json:"email_verified"`
+//	}
+//	if err := idToken.Claims(&claims); err != nil {
+//		// handle error
+//	}
 func (i *IDToken) Claims(v interface{}) error {
 	if i.claims == nil {
 		return errors.New("oidc: claims not set")
