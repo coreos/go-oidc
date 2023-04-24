@@ -362,14 +362,19 @@ func (ts *testServer) run(t *testing.T) string {
 		]
 	}`
 
+	var userInfoJSON string
+	if ts.userInfo != "" {
+		userInfoJSON = fmt.Sprintf(`"userinfo_endpoint": "%s/userinfo",`, server.URL)
+	}
+
 	wellKnown := fmt.Sprintf(`{
 		"issuer": "%[1]s",
 		"authorization_endpoint": "%[1]s/auth",
 		"token_endpoint": "%[1]s/token",
 		"jwks_uri": "%[1]s/keys",
-		"userinfo_endpoint": "%[1]s/userinfo",
+		%[2]s
 		"id_token_signing_alg_values_supported": ["RS256"]
-	}`, server.URL)
+	}`, server.URL, userInfoJSON)
 
 	newMux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, req *http.Request) {
 		_, err := io.WriteString(w, wellKnown)
@@ -383,13 +388,15 @@ func (ts *testServer) run(t *testing.T) string {
 			w.WriteHeader(500)
 		}
 	})
-	newMux.HandleFunc("/userinfo", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Add("Content-Type", ts.contentType)
-		_, err := io.WriteString(w, ts.userInfo)
-		if err != nil {
-			w.WriteHeader(500)
-		}
-	})
+	if ts.userInfo != "" {
+		newMux.HandleFunc("/userinfo", func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Add("Content-Type", ts.contentType)
+			_, err := io.WriteString(w, ts.userInfo)
+			if err != nil {
+				w.WriteHeader(500)
+			}
+		})
+	}
 	t.Cleanup(server.Close)
 	return server.URL
 }
@@ -489,6 +496,13 @@ func TestUserInfoEndpoint(t *testing.T) {
 				claims:        []byte(userInfoJSONCognitoVariant),
 			},
 		},
+		{
+			name: "no userinfo endpoint",
+			server: testServer{
+				contentType: "application/json",
+				userInfo:    "",
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -500,6 +514,19 @@ func TestUserInfoEndpoint(t *testing.T) {
 			provider, err := NewProvider(ctx, serverURL)
 			if err != nil {
 				t.Fatalf("Failed to initialize provider for test %v", err)
+			}
+
+			if test.server.userInfo == "" {
+				if provider.UserInfoEndpoint() != "" {
+					t.Errorf("expected UserInfoEndpoint to be empty, got %v", provider.UserInfoEndpoint())
+				}
+
+				// provider.UserInfo will error.
+				return
+			}
+
+			if provider.UserInfoEndpoint() != serverURL+"/userinfo" {
+				t.Errorf("expected UserInfoEndpoint to be %v , got %v", serverURL+"/userinfo", provider.UserInfoEndpoint())
 			}
 
 			fakeOauthToken := oauth2.Token{}

@@ -275,6 +275,12 @@ func (p *Provider) Endpoint() oauth2.Endpoint {
 	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL}
 }
 
+// UserInfoEndpoint returns the OpenID Connect userinfo endpoint for the given
+// provider.
+func (p *Provider) UserInfoEndpoint() string {
+	return p.userInfoURL
+}
+
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
 	Subject       string `json:"sub"`
