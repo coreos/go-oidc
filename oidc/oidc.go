@@ -36,8 +36,9 @@ const (
 )
 
 var (
-	errNoAtHash      = errors.New("id token did not have an access token hash")
-	errInvalidAtHash = errors.New("access token hash does not match value in ID token")
+	errNoAtHash             = errors.New("id token did not have an access token hash")
+	errInvalidAtHash        = errors.New("access token hash does not match value in ID token")
+	ErrUserInfoNotSupported = errors.New("oidc: user info endpoint is not supported by this provider")
 )
 
 type contextKey int
@@ -306,7 +307,7 @@ func (u *UserInfo) Claims(v interface{}) error {
 // UserInfo uses the token source to query the provider's user info endpoint.
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource) (*UserInfo, error) {
 	if p.userInfoURL == "" {
-		return nil, errors.New("oidc: user info endpoint is not supported by this provider")
+		return nil, ErrUserInfoNotSupported
 	}
 
 	req, err := http.NewRequest("GET", p.userInfoURL, nil)
