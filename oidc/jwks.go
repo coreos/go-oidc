@@ -7,7 +7,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -230,13 +230,13 @@ func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxRespBodySize))
 	if err != nil {
 		return nil, fmt.Errorf("unable to read response body: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("oidc: get keys failed: %s %s", resp.Status, body)
+		return nil, fmt.Errorf("oidc: get keys failed: %s %s", resp.Status, body[:getMaxLogSizeForBody(body)])
 	}
 
 	var keySet jose.JSONWebKeySet

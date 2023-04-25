@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"strings"
@@ -33,6 +33,10 @@ const (
 	//
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess
 	ScopeOfflineAccess = "offline_access"
+)
+
+const (
+	maxRespBodySize = 262144
 )
 
 var (
@@ -210,17 +214,13 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxRespBodySize))
 	if err != nil {
 		return nil, fmt.Errorf("unable to read response body: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		maxBodySize := len(body)
-		if maxBodySize > 2048 {
-			maxBodySize = 2048
-		}
-		return nil, fmt.Errorf("%s: %s", resp.Status, body[:maxBodySize])
+		return nil, fmt.Errorf("%s: %s", resp.Status, body[:getMaxLogSizeForBody(body)])
 	}
 
 	var p providerJSON
@@ -335,12 +335,12 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxRespBodySize))
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %s", resp.Status, body)
+		return nil, fmt.Errorf("%s: %s", resp.Status, body[:getMaxLogSizeForBody(body)])
 	}
 
 	ct := resp.Header.Get("Content-Type")
@@ -547,4 +547,11 @@ func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
 		return fmt.Errorf("got Content-Type = application/json, but could not unmarshal as JSON: %v", err)
 	}
 	return fmt.Errorf("expected Content-Type = application/json, got %q: %v", ct, err)
+}
+
+func getMaxLogSizeForBody(body []byte) int {
+	if len(body) > 2048 {
+		return 2048
+	}
+	return len(body)
 }
