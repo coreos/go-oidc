@@ -216,7 +216,11 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %s", resp.Status, body)
+		maxBodySize := len(body)
+		if maxBodySize > 2048 {
+			maxBodySize = 2048
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, body[:maxBodySize])
 	}
 
 	var p providerJSON
