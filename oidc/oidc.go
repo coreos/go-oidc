@@ -281,6 +281,19 @@ func (p *Provider) UserInfoEndpoint() string {
 	return p.userInfoURL
 }
 
+// Sends back a generated copy of the Provider's configuration, for clients
+// that might need to know this info from an automated Discovery Endpoint.
+func (p *Provider) Config() ProviderConfig {
+	return ProviderConfig{
+		IssuerURL: p.issuer,
+		AuthURL: p.authURL,
+		TokenURL: p.tokenURL,
+		UserInfoURL: p.userInfoURL,
+		JWKSURL: p.jwksURL,
+		Algorithms: p.algorithms,
+	}
+}
+
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
 	Subject       string `json:"sub"`
