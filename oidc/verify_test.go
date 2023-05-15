@@ -26,6 +26,16 @@ func TestVerify(t *testing.T) {
 			signKey: newRSAKey(t),
 		},
 		{
+			name:    "good eddsa token",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck:    true,
+				SkipExpiryCheck:      true,
+				SupportedSigningAlgs: []string{EdDSA},
+			},
+			signKey: newEdDSAKey(t),
+		},
+		{
 			name:    "invalid issuer",
 			issuer:  "https://bar",
 			idToken: `{"iss":"https://foo"}`,
@@ -213,6 +223,16 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipExpiryCheck:      true,
 			},
 			signKey: newECDSAKey(t),
+		},
+		{
+			name:    "eddsa signing",
+			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck:    true,
+				SkipExpiryCheck:      true,
+				SupportedSigningAlgs: []string{EdDSA},
+			},
+			signKey: newEdDSAKey(t),
 		},
 		{
 			name:    "one of many supported",
