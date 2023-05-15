@@ -149,6 +149,7 @@ var supportedAlgorithms = map[string]bool{
 	PS256: true,
 	PS384: true,
 	PS512: true,
+	EdDSA: true,
 }
 
 // ProviderConfig allows creating providers when discovery isn't supported. It's
@@ -448,7 +449,7 @@ func (i *IDToken) VerifyAccessToken(accessToken string) error {
 		h = sha256.New()
 	case RS384, ES384, PS384:
 		h = sha512.New384()
-	case RS512, ES512, PS512:
+	case RS512, ES512, PS512, EdDSA:
 		h = sha512.New()
 	default:
 		return fmt.Errorf("oidc: unsupported signing algorithm %q", i.sigAlgorithm)

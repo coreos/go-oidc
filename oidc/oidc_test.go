@@ -91,6 +91,12 @@ func TestAccessTokenVerification(t *testing.T) {
 			assertMsg("id token did not have an access token hash"),
 		},
 		{
+			"EdDSA",
+			newToken("EdDSA", computed512TokenHash),
+			googleAccessToken,
+			assertNil,
+		},
+		{
 			"badSignAlgo",
 			newToken("none", "xxx"),
 			googleAccessToken,
@@ -135,11 +141,11 @@ func TestNewProvider(t *testing.T) {
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
 				"jwks_uri": "https://example.com/keys",
-				"id_token_signing_alg_values_supported": ["RS256", "RS384", "ES256"]
+				"id_token_signing_alg_values_supported": ["RS256", "RS384", "ES256", "EdDSA"]
 			}`,
 			wantAuthURL:    "https://example.com/auth",
 			wantTokenURL:   "https://example.com/token",
-			wantAlgorithms: []string{"RS256", "RS384", "ES256"},
+			wantAlgorithms: []string{"RS256", "RS384", "ES256", "EdDSA"},
 		},
 		{
 			name: "unsupported_algorithms",

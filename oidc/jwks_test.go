@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -79,6 +80,14 @@ func newECDSAKey(t *testing.T) *signingKey {
 	return &signingKey{"", priv, priv.Public(), jose.ES256}
 }
 
+func newEdDSAKey(t *testing.T) *signingKey {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &signingKey{"", privateKey, publicKey, jose.EdDSA}
+}
+
 func TestRSAVerify(t *testing.T) {
 	good := newRSAKey(t)
 	bad := newRSAKey(t)
@@ -89,6 +98,12 @@ func TestRSAVerify(t *testing.T) {
 func TestECDSAVerify(t *testing.T) {
 	good := newECDSAKey(t)
 	bad := newECDSAKey(t)
+	testKeyVerify(t, good, bad, good)
+}
+
+func TestEdDSAVerify(t *testing.T) {
+	good := newEdDSAKey(t)
+	bad := newEdDSAKey(t)
 	testKeyVerify(t, good, bad, good)
 }
 

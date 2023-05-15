@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -32,6 +33,7 @@ func (s *StaticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 		switch pub.(type) {
 		case *rsa.PublicKey:
 		case *ecdsa.PublicKey:
+		case ed25519.PublicKey:
 		default:
 			return nil, fmt.Errorf("invalid public key type provided: %T", pub)
 		}
