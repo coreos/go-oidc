@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -138,6 +139,41 @@ func TestMismatchedKeyID(t *testing.T) {
 	testKeyVerify(t, key2, bad, key1, key2)
 }
 
+func TestKeyVerifyContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	payload := []byte("a secret")
+
+	good := newECDSAKey(t)
+	jws, err := jose.ParseSigned(good.sign(t, payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ch := make(chan struct{})
+	defer close(ch)
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-ch
+	}))
+	defer s.Close()
+
+	rks := newRemoteKeySet(ctx, s.URL, nil)
+
+	cancel()
+
+	// Ensure the token verifies.
+	_, err = rks.verify(ctx, jws)
+	if err == nil {
+		t.Fatal("expected context canceled, got nil error")
+	}
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected error to be %q got %q", context.Canceled, err)
+	}
+}
+
 func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signingKey) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -259,7 +295,7 @@ func BenchmarkVerify(b *testing.B) {
 
 	key := newRSAKey(b)
 
-	now := time.Date(2022, 01, 29, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2022, 1, 29, 0, 0, 0, 0, time.UTC)
 	exp := now.Add(time.Hour)
 	payload := []byte(fmt.Sprintf(`{
 		"iss": "https://example.com",
