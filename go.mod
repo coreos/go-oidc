@@ -1,4 +1,4 @@
-module github.com/coreos/go-oidc/v3
+module github.com/dptsi/go-oidc/v3
 
 go 1.19
 
