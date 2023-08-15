@@ -24,6 +24,33 @@ const (
 	// ScopeOpenID is the mandatory scope for all OpenID Connect OAuth2 requests.
 	ScopeOpenID = "openid"
 
+	// ScopeProfile is an optional [scope value] defined by OpenID Connect for requesting
+	// access to the End-User's default profile Claims, which are:
+	// name, family_name, given_name, middle_name, nickname, preferred_username,
+	// profile, picture, website, gender, birthdate, zoneinfo, locale, and updated_at.
+	//
+	// [scope value]: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+	ScopeProfile = "profile"
+
+	// ScopeEmail is an optional [scope value] defined by OpenID Connect for requesting
+	// access to the email and email_verified Claims.
+	//
+	// [scope value]: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+	ScopeEmail = "email"
+
+	// ScopeAddress is an optional [scope value] defined by OpenID Connect for requesting
+	// access to the [address Claim].
+	//
+	// [scope value]: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+	// [address Claim]: https://openid.net/specs/openid-connect-core-1_0.html#AddressClaim
+	ScopeAddress = "address"
+
+	// ScopePhone is an optional [scope value] defined by OpenID Connect for requesting
+	// access to the phone_number and phone_number_verified Claims.
+	//
+	// [scope value]: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+	ScopePhone = "phone"
+
 	// ScopeOfflineAccess is an optional scope defined by OpenID Connect for requesting
 	// OAuth2 refresh tokens.
 	//
