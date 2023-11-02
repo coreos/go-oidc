@@ -116,6 +116,7 @@ func TestNewProvider(t *testing.T) {
 		trailingSlash     bool
 		wantAuthURL       string
 		wantTokenURL      string
+		wantDeviceAuthURL string
 		wantUserInfoURL   string
 		wantIssuerURL     string
 		wantAlgorithms    []string
@@ -205,11 +206,12 @@ func TestNewProvider(t *testing.T) {
 		{
 			// Test case taken directly from:
 			// https://accounts.google.com/.well-known/openid-configuration
-			name:            "google",
-			wantAuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
-			wantTokenURL:    "https://oauth2.googleapis.com/token",
-			wantUserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
-			wantAlgorithms:  []string{"RS256"},
+			name:              "google",
+			wantAuthURL:       "https://accounts.google.com/o/oauth2/v2/auth",
+			wantTokenURL:      "https://oauth2.googleapis.com/token",
+			wantDeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+			wantUserInfoURL:   "https://openidconnect.googleapis.com/v1/userinfo",
+			wantAlgorithms:    []string{"RS256"},
 			data: `{
  "issuer": "ISSUER",
  "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
@@ -319,6 +321,10 @@ func TestNewProvider(t *testing.T) {
 			if p.tokenURL != test.wantTokenURL {
 				t.Errorf("NewProvider() unexpected tokenURL value, got=%s, want=%s",
 					p.tokenURL, test.wantTokenURL)
+			}
+			if p.deviceAuthURL != test.wantDeviceAuthURL {
+				t.Errorf("NewProvider() unexpected deviceAuthURL value, got=%s, want=%s",
+					p.deviceAuthURL, test.wantDeviceAuthURL)
 			}
 			if p.userInfoURL != test.wantUserInfoURL {
 				t.Errorf("NewProvider() unexpected userInfoURL value, got=%s, want=%s",
