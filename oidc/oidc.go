@@ -99,6 +99,7 @@ type Provider struct {
 	tokenURL    string
 	userInfoURL string
 	jwksURL     string
+	deviceAuthURL string
 	algorithms  []string
 
 	// Raw claims returned by the server.
@@ -133,6 +134,7 @@ type providerJSON struct {
 	TokenURL    string   `json:"token_endpoint"`
 	JWKSURL     string   `json:"jwks_uri"`
 	UserInfoURL string   `json:"userinfo_endpoint"`
+	DeviceAuthURL string `json:"device_authorization_endpoint"`
 	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
 }
 
@@ -174,7 +176,9 @@ type ProviderConfig struct {
 	// verify issued ID tokens. This endpoint is polled as new keys are made
 	// available.
 	JWKSURL string
-
+	// DeviceAuthURL is the endpoint used by the provider to support the Oauth 2.0
+	// Device Authorization flow.
+	DeviceAuthURL string
 	// Algorithms, if provided, indicate a list of JWT algorithms allowed to sign
 	// ID tokens. If not provided, this defaults to the algorithms advertised by
 	// the JWK endpoint, then the set of algorithms supported by this package.
@@ -191,6 +195,7 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 		userInfoURL: p.UserInfoURL,
 		jwksURL:     p.JWKSURL,
 		algorithms:  p.Algorithms,
+		deviceAuthURL: p.DeviceAuthURL,
 		client:      getClient(ctx),
 	}
 }
@@ -245,6 +250,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		tokenURL:    p.TokenURL,
 		userInfoURL: p.UserInfoURL,
 		jwksURL:     p.JWKSURL,
+		deviceAuthURL: p.DeviceAuthURL,
 		algorithms:  algs,
 		rawClaims:   body,
 		client:      getClient(ctx),
@@ -273,7 +279,7 @@ func (p *Provider) Claims(v interface{}) error {
 
 // Endpoint returns the OAuth2 auth and token endpoints for the given provider.
 func (p *Provider) Endpoint() oauth2.Endpoint {
-	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL}
+	return oauth2.Endpoint{AuthURL: p.authURL, TokenURL: p.tokenURL, DeviceAuthURL: p.deviceAuthURL}
 }
 
 // UserInfoEndpoint returns the OpenID Connect userinfo endpoint for the given
