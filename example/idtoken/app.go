@@ -7,9 +7,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -63,6 +65,16 @@ func main() {
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ru, err := url.Parse(config.RedirectURL)
+		if err != nil {
+			http.Error(w, "Failed to parse redirect URL", http.StatusInternalServerError)
+			return
+		}
+		if r.Host != ru.Host {
+			str := fmt.Sprintf("Redirect URL(%s) pointing to different Host(%s)", ru.Host, r.Host)
+			http.Error(w, str, http.StatusInternalServerError)
+			return
+		}
 		state, err := randString(16)
 		if err != nil {
 			http.Error(w, "Internal error", http.StatusInternalServerError)
