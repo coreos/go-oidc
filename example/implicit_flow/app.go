@@ -8,8 +8,10 @@ import (
 	// "encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	oidc "github.com/coreos/go-oidc/v3/oidc"
+	// "github.com/google/uuid"
 )
 
 var (
@@ -19,6 +21,8 @@ var (
 	// state should be cookie? and is a JWT?:
 	myState = "987654321state"
 )
+
+// would need to be in main:
 
 // ctx := context.Background()
 
@@ -40,11 +44,53 @@ var (
 	})
 )
 
+func setCallbackCookie(w http.ResponseWriter, r *http.Request, name, value string) {
+	c := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		MaxAge:   int(time.Hour.Seconds()),
+		Secure:   r.TLS != nil,
+		HttpOnly: true,
+	}
+	http.SetCookie(w, c)
+}
+
+func generateNonce() string {
+	// return uuid.New().String()
+	return "9999-efbc-5434-3cde-acde"
+}
+
+var nonce = generateNonce()
+
 func handleLaunch(w http.ResponseWriter, r *http.Request) {
-	if r.FormValue("state") == myState {
+	// if r.FormValue("state") == myState {
+	// 	fmt.Println("Got state back!!! 👍")
+	// } else {
+	// 	fmt.Println("where'd my state go?????")
+	// }
+
+	state, err := r.Cookie("state")
+	if err != nil {
+		http.Error(w, "state not found", http.StatusBadRequest)
+		return
+	}
+
+	if state.Value == myState {
 		fmt.Println("Got state back!!! 👍")
 	} else {
 		fmt.Println("where'd my state go?????")
+	}
+
+	nonce, err := r.Cookie("nonce")
+	if err != nil {
+		http.Error(w, "nonce not found", http.StatusBadRequest)
+		return
+	}
+
+	if nonce.Value == myState {
+		fmt.Println("Got nonce back!!! 🎉")
+	} else {
+		fmt.Println("where'd my NONCE go?????")
 	}
 
 	// Extract the JWT from the request
@@ -110,7 +156,7 @@ func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 	loginHint := r.FormValue("login_hint")
 	ltiMessageHint := r.FormValue("lti_message_hint")
 	ltiDeploymentID := r.FormValue("lti_deployment_id")
-	// some kind of deploymeny id check... --> DB
+	// some kind of deployment id check... --> DB
 	iss := r.FormValue("iss")
 	if iss != "Platform" {
 		fmt.Println("Incorrect issuer")
@@ -123,8 +169,12 @@ func handleLoginInit(w http.ResponseWriter, r *http.Request) {
 	redirURL := "http://localhost:9090/authlogin?" +
 		"client_id=" + clientID + "&target_link_uri=" + targetLinkUri +
 		"&login_hint=" + loginHint + "&response_type=id_token" +
-		"&state=" + myState + "&redirect_uri=http://localhost:8881/ltiLaunch" +
+		// "&state=" + myState +
+		"&redirect_uri=http://localhost:8881/ltiLaunch" +
 		"&lti_message_hint=" + ltiMessageHint + "&lti_deployment_id=" + ltiDeploymentID
+
+	setCallbackCookie(w, r, "state", myState)
+	setCallbackCookie(w, r, "nonce", nonce)
 
 	// fmt.Fprintf(w, "Redirecting to LMS authorization endpoint...")
 	fmt.Println("URL redirect - to the Plat side: " + redirURL)
