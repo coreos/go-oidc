@@ -21,19 +21,7 @@ const (
 	issuerGoogleAccountsNoScheme = "accounts.google.com"
 )
 
-// TokenExpiredError indicates that Verify failed because the token was expired. This
-// error does NOT indicate that the token is not also invalid for other reasons. Other
-// checks might have failed if the expiration check had not failed.
-type TokenExpiredError struct {
-	// Expiry is the time when the token expired.
-	Expiry time.Time
-}
-
-func (e *TokenExpiredError) Error() string {
-	return fmt.Sprintf("oidc: token is expired (Token Expiry: %v)", e.Expiry)
-}
-
-// KeySet is a set of publc JSON Web Keys that can be used to validate the signature
+// KeySet is a set of public JSON Web Keys that can be used to validate the signature
 // of JSON web tokens. This is expected to be backed by a remote key set through
 // provider metadata discovery or an in-memory set of keys delivered out-of-band.
 type KeySet interface {
@@ -264,7 +252,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		//
 		// We will not add hooks to let other providers go off spec like this.
 		if !(v.issuer == issuerGoogleAccounts && t.Issuer == issuerGoogleAccountsNoScheme) {
-			return nil, fmt.Errorf("oidc: id token issued by a different provider, expected %q got %q", v.issuer, t.Issuer)
+			return nil, &InvalidIssuerError{Expected: v.issuer, Actual: t.Issuer}
 		}
 	}
 
@@ -274,7 +262,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	if !v.config.SkipClientIDCheck {
 		if v.config.ClientID != "" {
 			if !contains(t.Audience, v.config.ClientID) {
-				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
+				return nil, &InvalidAudienceError{Expected: v.config.ClientID, Actual: t.Audience}
 			}
 		} else {
 			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")

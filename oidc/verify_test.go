@@ -5,11 +5,13 @@ import (
 	"crypto"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,6 +26,7 @@ func TestVerify(t *testing.T) {
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "good eddsa token",
@@ -34,6 +37,7 @@ func TestVerify(t *testing.T) {
 				SupportedSigningAlgs: []string{EdDSA},
 			},
 			signKey: newEdDSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "invalid issuer",
@@ -44,7 +48,10 @@ func TestVerify(t *testing.T) {
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
-			wantErr: true,
+			errFunc: expectAll(
+				expectErrorType[*InvalidIssuerError],
+				expectErrorMessage(`oidc: id token issued by a different provider, expected "https://bar" got "https://foo"`),
+			),
 		},
 		{
 			name:    "skip issuer check",
@@ -56,6 +63,7 @@ func TestVerify(t *testing.T) {
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "invalid sig",
@@ -66,7 +74,7 @@ func TestVerify(t *testing.T) {
 			},
 			signKey:         newRSAKey(t),
 			verificationKey: newRSAKey(t),
-			wantErr:         true,
+			errFunc:         expectError,
 		},
 		{
 			name:    "google accounts without scheme",
@@ -77,6 +85,7 @@ func TestVerify(t *testing.T) {
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "expired token",
@@ -84,8 +93,8 @@ func TestVerify(t *testing.T) {
 			config: Config{
 				SkipClientIDCheck: true,
 			},
-			signKey:       newRSAKey(t),
-			wantErrExpiry: true,
+			signKey: newRSAKey(t),
+			errFunc: expectErrorType[*TokenExpiredError],
 		},
 		{
 			name:    "unexpired token",
@@ -94,6 +103,7 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name: "expiry as float",
@@ -104,6 +114,7 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name: "nbf in future",
@@ -113,7 +124,7 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
-			wantErr: true,
+			errFunc: expectError,
 		},
 		{
 			name: "nbf in past",
@@ -123,6 +134,7 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name: "nbf in future within clock skew tolerance",
@@ -132,6 +144,7 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "unsigned token",
@@ -140,7 +153,7 @@ func TestVerify(t *testing.T) {
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
 			},
-			wantErr: true,
+			errFunc: expectError,
 		},
 		{
 			name:    "unsigned token InsecureSkipSignatureCheck",
@@ -150,6 +163,7 @@ func TestVerify(t *testing.T) {
 				SkipExpiryCheck:            true,
 				InsecureSkipSignatureCheck: true,
 			},
+			errFunc: expectSuccess,
 		},
 	}
 	for _, test := range tests {
@@ -167,6 +181,7 @@ func TestVerifyAudience(t *testing.T) {
 				SkipExpiryCheck: true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "mismatched audience",
@@ -176,7 +191,10 @@ func TestVerifyAudience(t *testing.T) {
 				SkipExpiryCheck: true,
 			},
 			signKey: newRSAKey(t),
-			wantErr: true,
+			errFunc: expectAll(
+				expectErrorType[*InvalidAudienceError],
+				expectErrorMessage(`oidc: expected audience "client1" got ["client2"]`),
+			),
 		},
 		{
 			name:    "multiple audiences, one matches",
@@ -186,6 +204,7 @@ func TestVerifyAudience(t *testing.T) {
 				SkipExpiryCheck: true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 	}
 	for _, test := range tests {
@@ -203,6 +222,7 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipExpiryCheck:   true,
 			},
 			signKey: newRSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "bad signing alg",
@@ -212,7 +232,7 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipExpiryCheck:   true,
 			},
 			signKey: newECDSAKey(t),
-			wantErr: true,
+			errFunc: expectError,
 		},
 		{
 			name:    "ecdsa signing",
@@ -223,6 +243,7 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipExpiryCheck:      true,
 			},
 			signKey: newECDSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "eddsa signing",
@@ -233,6 +254,7 @@ func TestVerifySigningAlg(t *testing.T) {
 				SupportedSigningAlgs: []string{EdDSA},
 			},
 			signKey: newEdDSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "one of many supported",
@@ -243,6 +265,7 @@ func TestVerifySigningAlg(t *testing.T) {
 				SupportedSigningAlgs: []string{RS256, ES256},
 			},
 			signKey: newECDSAKey(t),
+			errFunc: expectSuccess,
 		},
 		{
 			name:    "not in requiredAlgs",
@@ -253,7 +276,7 @@ func TestVerifySigningAlg(t *testing.T) {
 				SkipExpiryCheck:      true,
 			},
 			signKey: newECDSAKey(t),
-			wantErr: true,
+			errFunc: expectError,
 		},
 	}
 	for _, test := range tests {
@@ -271,6 +294,7 @@ func TestAccessTokenHash(t *testing.T) {
 			SkipExpiryCheck: true,
 		},
 		signKey: newRSAKey(t),
+		errFunc: expectSuccess,
 	}
 	t.Run("at_hash", func(t *testing.T) {
 		tok, err := vt.runGetToken(t)
@@ -324,7 +348,7 @@ func TestDistributedClaims(t *testing.T) {
 				signKey: newRSAKey(t),
 			},
 			want: map[string]claimSource{
-				"address": claimSource{Endpoint: "123", AccessToken: "1234"},
+				"address": {Endpoint: "123", AccessToken: "1234"},
 			},
 		},
 		{
@@ -347,8 +371,8 @@ func TestDistributedClaims(t *testing.T) {
 				signKey: newRSAKey(t),
 			},
 			want: map[string]claimSource{
-				"address":      claimSource{Endpoint: "123", AccessToken: "1234"},
-				"phone_number": claimSource{Endpoint: "123", AccessToken: "1234"},
+				"address":      {Endpoint: "123", AccessToken: "1234"},
+				"phone_number": {Endpoint: "123", AccessToken: "1234"},
 			},
 		},
 		{
@@ -554,6 +578,8 @@ func (v resolverTest) testEndpoint(t *testing.T) ([]byte, error) {
 	return resolveDistributedClaim(ctx, verifier, src)
 }
 
+type errCheck func(error) string
+
 type verificationTest struct {
 	// Name of the subtest.
 	name string
@@ -570,9 +596,8 @@ type verificationTest struct {
 	// testing invalid signatures.
 	verificationKey *signingKey
 
-	config        Config
-	wantErr       bool
-	wantErrExpiry bool
+	config  Config
+	errFunc func(error) string
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
@@ -605,16 +630,60 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 
 func (v verificationTest) run(t *testing.T) {
 	_, err := v.runGetToken(t)
-	if err != nil && !v.wantErr && !v.wantErrExpiry {
-		t.Errorf("%v", err)
+	if msg := v.errFunc(err); msg != "" {
+		t.Errorf("%v", msg)
 	}
-	if err == nil && (v.wantErr || v.wantErrExpiry) {
-		t.Errorf("expected error")
+}
+
+func expectError(err error) string {
+	if err == nil {
+		return "expected error, got nil"
 	}
-	if v.wantErrExpiry {
-		var errExp *TokenExpiredError
-		if !errors.As(err, &errExp) {
-			t.Errorf("expected *TokenExpiryError but got %q", err)
+
+	return ""
+}
+
+func expectSuccess(err error) string {
+	if err != nil {
+		return fmt.Sprintf("expected no error, got %v", err)
+	}
+
+	return ""
+}
+
+func expectErrorType[T error](err error) string {
+	var errT T
+	if !errors.As(err, &errT) {
+		return fmt.Sprintf("expected %T but got %T", errT, err)
+	}
+
+	return ""
+}
+
+func expectAll(checks ...errCheck) errCheck {
+	return func(err error) string {
+		var messages []string
+
+		for _, check := range checks {
+			if msg := check(err); msg != "" {
+				messages = append(messages, msg)
+			}
 		}
+
+		return strings.Join(messages, "\n")
+	}
+}
+
+func expectErrorMessage(expectedMsg string) errCheck {
+	return func(err error) string {
+		if err == nil {
+			return fmt.Sprintf("expected error %q, got nil", expectedMsg)
+		}
+
+		if err.Error() != expectedMsg {
+			return fmt.Sprintf("expected error %q, got %q", expectedMsg, err.Error())
+		}
+
+		return ""
 	}
 }
