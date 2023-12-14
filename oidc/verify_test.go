@@ -631,7 +631,7 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 func (v verificationTest) run(t *testing.T) {
 	_, err := v.runGetToken(t)
 	if msg := v.errFunc(err); msg != "" {
-		t.Errorf("%v", msg)
+		t.Error(msg)
 	}
 }
 
@@ -654,7 +654,7 @@ func expectSuccess(err error) string {
 func expectErrorType[T error](err error) string {
 	var errT T
 	if !errors.As(err, &errT) {
-		return fmt.Sprintf("expected %T but got %T", errT, err)
+		return fmt.Sprintf("expected error type %T but got %T", errT, err)
 	}
 
 	return ""
