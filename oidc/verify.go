@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	jose "github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3"
 	"golang.org/x/oauth2"
 )
 
@@ -31,6 +31,19 @@ type TokenExpiredError struct {
 
 func (e *TokenExpiredError) Error() string {
 	return fmt.Sprintf("oidc: token is expired (Token Expiry: %v)", e.Expiry)
+}
+
+// UnexpectedAudienceError indicates that the audience claim of the token did not match
+// any of the expected audiences.
+type UnexpectedAudienceError struct {
+	// ClientID is the client ID that was used to initialize the verifier.
+	ClientID string
+	// Audience is the audiences specified in the token.
+	Audience []string
+}
+
+func (e *UnexpectedAudienceError) Error() string {
+	return fmt.Sprintf("oidc: expected audience %q got %q", e.ClientID, e.Audience)
 }
 
 // KeySet is a set of publc JSON Web Keys that can be used to validate the signature
@@ -274,7 +287,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	if !v.config.SkipClientIDCheck {
 		if v.config.ClientID != "" {
 			if !contains(t.Audience, v.config.ClientID) {
-				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
+				return nil, &UnexpectedAudienceError{v.config.ClientID, t.Audience}
 			}
 		} else {
 			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")

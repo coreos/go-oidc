@@ -175,8 +175,8 @@ func TestVerifyAudience(t *testing.T) {
 				ClientID:        "client1",
 				SkipExpiryCheck: true,
 			},
-			signKey: newRSAKey(t),
-			wantErr: true,
+			signKey:    newRSAKey(t),
+			wantErrAud: true,
 		},
 		{
 			name:    "multiple audiences, one matches",
@@ -573,6 +573,7 @@ type verificationTest struct {
 	config        Config
 	wantErr       bool
 	wantErrExpiry bool
+	wantErrAud    bool
 }
 
 func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
@@ -605,16 +606,22 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 
 func (v verificationTest) run(t *testing.T) {
 	_, err := v.runGetToken(t)
-	if err != nil && !v.wantErr && !v.wantErrExpiry {
+	if err != nil && !v.wantErr && !v.wantErrExpiry && !v.wantErrAud {
 		t.Errorf("%v", err)
 	}
-	if err == nil && (v.wantErr || v.wantErrExpiry) {
+	if err == nil && (v.wantErr || v.wantErrExpiry || v.wantErrAud) {
 		t.Errorf("expected error")
 	}
 	if v.wantErrExpiry {
 		var errExp *TokenExpiredError
 		if !errors.As(err, &errExp) {
 			t.Errorf("expected *TokenExpiryError but got %q", err)
+		}
+	}
+	if v.wantErrAud {
+		var errAud *UnexpectedAudienceError
+		if !errors.As(err, &errAud) {
+			t.Errorf("expected *AudienceError but got %q", err)
 		}
 	}
 }
