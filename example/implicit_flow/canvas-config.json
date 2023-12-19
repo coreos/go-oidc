@@ -1,0 +1,54 @@
+{
+  "title": "Kiddom 1.3 LTI test tool",
+  "scopes": [],
+  "extensions": [
+      {
+          "domain": "http://localhost:8881",
+          "tool_id": "course-nav",
+          "platform": "canvas.instructure.com",
+          "settings": {
+              "text": "Kiddom LTI 1.3 course",
+              "icon_url": "https://www.kiddom.co/wp-content/uploads/2021/12/kiddom-logo-nav.svg",
+              "privacy_level": "public",
+              "placements": [
+                  {
+                      "text": "Kiddom 1.3 LAUNCH",
+                      "enabled": true,
+                      "icon_url": "https://www.kiddom.co/wp-content/uploads/2021/12/kiddom-logo-nav.svg",
+                      "placement": "course_navigation",
+                      "message_type": "LtiResourceLinkRequest",
+                      "target_link_uri": "http://localhost:8881/content"
+                  },
+                  {
+                      "text": "Kiddom 1.3 Link",
+                      "enabled": true,
+                      "icon_url": "https://www.kiddom.co/wp-content/uploads/2021/12/kiddom-logo-nav.svg",
+                      "placement": "link_selection",
+                      "message_type": "LtiResourceLinkRequest",
+                      "target_link_uri": "http://localhost:8881/content"
+                  },
+                  {
+                      "text": "Kiddom 1.3 Assignment",
+                      "enabled": true,
+                      "icon_url": "https://www.kiddom.co/wp-content/uploads/2021/12/kiddom-logo-nav.svg",
+                      "placement": "assignment_selection",
+                      "message_type": "LtiResourceLinkRequest",
+                      "target_link_uri": "http://localhost:8881/content"
+                }
+              ]
+          }
+      }
+  ],
+  "public_jwk": {
+      "e": "AQAB",
+      "n": "lDwU6Eb4rhDy502widYvEKDNlPLYiPwF-o5L95OnVGz2wppk56dT8VEH2TyUT0Y6iAnxMp8OUPkhMnXhuecQdnV_C3oH3U07W0Hb97XhOArSA4_PipRZXVox2JNK1yo8alZCVbAHY0T85uY3P6MwBTxDry80DlKv0VA0amIANAh6Uq3rFrHhxqV9VW_AN52TSn1s7iqkzSGKDzYMTAHW1fiP4lNEsXoaDr2scla3ulOpUGX8xcgtXRWJDQhb0Zz8k8WEcltJ5mxskc4pkvUT2e0X38izClU13K5qUhAqLJUEAFfpICaVt13UtX2pdkN4SFM9qNflq_yttLTr9egTKBr541eie4OUCM_3naWaUCkkOToK8pB0iCD998MksQRZTfpUvNoUo7CRAK8wWtIWOYCIo8cpN63gclJavixEj3CMqXbwiRzd2p87vmPl0XW6qDIVHm8joSTEZV25ViUTHPAeqDRvrft9FS89qCfoYqr8Mj4y9uDilNsyB8Nt1CzjXeNrpW_fkyhY99KdVvBvN9nTRkEeiP-EcVpgbrdLJB8ZCOH9sz_WTnmFHH4457WP4rEjTf6wj1iL0y3H72i_5Ta1VzhmFFmWgL3xSwrykfEToJ-25URBbW3bZ4aSpuLLat113S4a3aqtrGbMTwAMQmr8GZ3R9MNMdJYdGmEpX9E",
+      "alg": "RS256",
+      "kid": "sig-1701988937",
+      "kty": "RSA",
+      "use": "sig"
+  },
+  "description": "Kiddom 1.3 Test Tool",
+  "custom_fields": {},
+  "target_link_uri": "http://localhost:8881/content",
+  "oidc_initiation_url": "http://localhost:8881/ltiLogin"
+}
