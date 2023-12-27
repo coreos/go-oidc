@@ -110,17 +110,18 @@ func TestAccessTokenVerification(t *testing.T) {
 
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
-		name              string
-		data              string
-		issuerURLOverride string
-		trailingSlash     bool
-		wantAuthURL       string
-		wantTokenURL      string
-		wantDeviceAuthURL string
-		wantUserInfoURL   string
-		wantIssuerURL     string
-		wantAlgorithms    []string
-		wantErr           bool
+		name                     string
+		data                     string
+		issuerURLOverride        string
+		trailingSlash            bool
+		wantAuthURL              string
+		wantTokenURL             string
+		wantDeviceAuthURL        string
+		wantUserInfoURL          string
+		wantIssuerURL            string
+		wantAlgorithms           []string
+		wantCodeChallengeMethods []string
+		wantErr                  bool
 	}{
 		{
 			name: "basic_case",
@@ -206,12 +207,13 @@ func TestNewProvider(t *testing.T) {
 		{
 			// Test case taken directly from:
 			// https://accounts.google.com/.well-known/openid-configuration
-			name:              "google",
-			wantAuthURL:       "https://accounts.google.com/o/oauth2/v2/auth",
-			wantTokenURL:      "https://oauth2.googleapis.com/token",
-			wantDeviceAuthURL: "https://oauth2.googleapis.com/device/code",
-			wantUserInfoURL:   "https://openidconnect.googleapis.com/v1/userinfo",
-			wantAlgorithms:    []string{"RS256"},
+			name:                     "google",
+			wantAuthURL:              "https://accounts.google.com/o/oauth2/v2/auth",
+			wantTokenURL:             "https://oauth2.googleapis.com/token",
+			wantDeviceAuthURL:        "https://oauth2.googleapis.com/device/code",
+			wantUserInfoURL:          "https://openidconnect.googleapis.com/v1/userinfo",
+			wantAlgorithms:           []string{"RS256"},
+			wantCodeChallengeMethods: []string{"plain", "S256"},
 			data: `{
  "issuer": "ISSUER",
  "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
@@ -333,6 +335,10 @@ func TestNewProvider(t *testing.T) {
 			if !reflect.DeepEqual(p.algorithms, test.wantAlgorithms) {
 				t.Errorf("NewProvider() unexpected algorithms value, got=%s, want=%s",
 					p.algorithms, test.wantAlgorithms)
+			}
+			if !reflect.DeepEqual(p.codeChallengeMethods, test.wantCodeChallengeMethods) {
+				t.Errorf("NewProvider() unexpected code challenge methods value, got=%s, want=%s",
+					p.codeChallengeMethods, test.wantCodeChallengeMethods)
 			}
 		})
 	}

@@ -94,13 +94,14 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer        string
-	authURL       string
-	tokenURL      string
-	deviceAuthURL string
-	userInfoURL   string
-	jwksURL       string
-	algorithms    []string
+	issuer               string
+	authURL              string
+	tokenURL             string
+	deviceAuthURL        string
+	userInfoURL          string
+	jwksURL              string
+	algorithms           []string
+	codeChallengeMethods []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -129,13 +130,14 @@ func (p *Provider) remoteKeySet() KeySet {
 }
 
 type providerJSON struct {
-	Issuer        string   `json:"issuer"`
-	AuthURL       string   `json:"authorization_endpoint"`
-	TokenURL      string   `json:"token_endpoint"`
-	DeviceAuthURL string   `json:"device_authorization_endpoint"`
-	JWKSURL       string   `json:"jwks_uri"`
-	UserInfoURL   string   `json:"userinfo_endpoint"`
-	Algorithms    []string `json:"id_token_signing_alg_values_supported"`
+	Issuer               string   `json:"issuer"`
+	AuthURL              string   `json:"authorization_endpoint"`
+	TokenURL             string   `json:"token_endpoint"`
+	DeviceAuthURL        string   `json:"device_authorization_endpoint"`
+	JWKSURL              string   `json:"jwks_uri"`
+	UserInfoURL          string   `json:"userinfo_endpoint"`
+	Algorithms           []string `json:"id_token_signing_alg_values_supported"`
+	CodeChallengeMethods []string `json:"code_challenge_methods_supported"`
 }
 
 // supportedAlgorithms is a list of algorithms explicitly supported by this
@@ -152,6 +154,18 @@ var supportedAlgorithms = map[string]bool{
 	PS384: true,
 	PS512: true,
 	EdDSA: true,
+}
+
+const (
+	S256Challenge  = "S256"
+	PlainChallenge = "plain"
+)
+
+// supportedCodeChallengeMethods indicate a list of methods used to generate the challenge (e.g., S256).
+// The PKCE spec defines two methods, S256 and plain.
+var supportedCodeChallengeMethods = map[string]bool{
+	S256Challenge:  true,
+	PlainChallenge: true,
 }
 
 // ProviderConfig allows creating providers when discovery isn't supported. It's
@@ -179,11 +193,13 @@ type ProviderConfig struct {
 	// verify issued ID tokens. This endpoint is polled as new keys are made
 	// available.
 	JWKSURL string
-
 	// Algorithms, if provided, indicate a list of JWT algorithms allowed to sign
 	// ID tokens. If not provided, this defaults to the algorithms advertised by
 	// the JWK endpoint, then the set of algorithms supported by this package.
 	Algorithms []string
+	// CodeChallengeMethods, if provided, indicate a list of methods used to generate the challenge (e.g., S256).
+	// The PKCE spec defines two methods, S256 and plain.
+	CodeChallengeMethods []string
 }
 
 // NewProvider initializes a provider from a set of endpoints, rather than
@@ -245,16 +261,25 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 			algs = append(algs, a)
 		}
 	}
+
+	var codeChallengeMethods []string
+	for _, m := range p.CodeChallengeMethods {
+		if supportedCodeChallengeMethods[m] {
+			codeChallengeMethods = append(codeChallengeMethods, m)
+		}
+	}
+
 	return &Provider{
-		issuer:        issuerURL,
-		authURL:       p.AuthURL,
-		tokenURL:      p.TokenURL,
-		deviceAuthURL: p.DeviceAuthURL,
-		userInfoURL:   p.UserInfoURL,
-		jwksURL:       p.JWKSURL,
-		algorithms:    algs,
-		rawClaims:     body,
-		client:        getClient(ctx),
+		issuer:               issuerURL,
+		authURL:              p.AuthURL,
+		tokenURL:             p.TokenURL,
+		deviceAuthURL:        p.DeviceAuthURL,
+		userInfoURL:          p.UserInfoURL,
+		jwksURL:              p.JWKSURL,
+		algorithms:           algs,
+		codeChallengeMethods: codeChallengeMethods,
+		rawClaims:            body,
+		client:               getClient(ctx),
 	}, nil
 }
 
