@@ -205,12 +205,13 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 //
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
-func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
-	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
+func NewProvider(ctx context.Context, issuer string, userFlow string) (*Provider, error) {
+	wellKnown := strings.TrimSuffix(issuer, "/") + userFlow + "/v2.0/.well-known/openid-configuration"
 	req, err := http.NewRequest("GET", wellKnown, nil)
 	if err != nil {
 		return nil, err
 	}
+	issuer = issuer + "/v2.0/"
 	resp, err := doRequest(ctx, req)
 	if err != nil {
 		return nil, err
