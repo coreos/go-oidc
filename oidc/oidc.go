@@ -289,6 +289,12 @@ func (p *Provider) UserInfoEndpoint() string {
 	return p.userInfoURL
 }
 
+// ClientContext returns a new context that carries the given HTTP client with
+// provider.
+func (p *Provider) ClientContext(ctx context.Context) context.Context {
+	return ClientContext(ctx, p.client)
+}
+
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
 	Subject       string `json:"sub"`

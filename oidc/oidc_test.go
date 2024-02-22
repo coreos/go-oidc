@@ -338,6 +338,35 @@ func TestNewProvider(t *testing.T) {
 	}
 }
 
+func TestProviderClientContext(t *testing.T) {
+	testServer := testServer{}
+
+	serverURL := testServer.run(t)
+
+	ctx := context.Background()
+
+	provider, err := NewProvider(ctx, serverURL)
+	if err != nil {
+		t.Errorf("Failed to initialize provider for test %v", err)
+	}
+
+	if c := getClient(provider.ClientContext(context.Background())); c != nil {
+		t.Errorf("cloneContext(): expected no *http.Client from empty context")
+	}
+
+	client := &http.Client{}
+	provider, err = NewProvider(ClientContext(ctx, client), serverURL)
+
+	if err != nil {
+		t.Errorf("Failed to initialize provider with *httpClient for test %v", err)
+	}
+
+	ctx = provider.ClientContext(context.Background())
+	if got := getClient(ctx); got == nil || client != got {
+		t.Errorf("cloneContext(): expected *http.Client from context")
+	}
+}
+
 func TestGetClient(t *testing.T) {
 	ctx := context.Background()
 	if c := getClient(ctx); c != nil {
