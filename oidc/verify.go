@@ -312,7 +312,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+		return nil, fmt.Errorf("oidc: malformed jws: %v", err)
 	}
 
 	switch len(jws.Signatures) {
