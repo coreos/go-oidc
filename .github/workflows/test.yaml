@@ -21,4 +21,6 @@ jobs:
       with:
         go-version: ${{ matrix.go }}
     - name: Test
-      run: "./test"
+      run: go test -v ./...
+    - name: Staticcheck
+      run: go run honnef.co/go/tools/cmd/staticcheck@2023.1.7 ./...
