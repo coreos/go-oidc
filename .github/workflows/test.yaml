@@ -9,15 +9,16 @@ on:
 
 jobs:
   build:
-    name: Linux
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.21', '1.22']
+    name: Linux Go ${{ matrix.go }}
     steps:
-    - name: Set up Go 1.19
-      uses: actions/setup-go@v2
+    - uses: actions/checkout@v4
+    - name: Setup go
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.19'
-      id: go
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+        go-version: ${{ matrix.go }}
     - name: Test
       run: "./test"
