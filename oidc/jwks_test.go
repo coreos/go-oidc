@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	jose "github.com/go-jose/go-jose/v3"
+	jose "github.com/go-jose/go-jose/v4"
 )
 
 type keyServer struct {
@@ -146,7 +146,7 @@ func TestKeyVerifyContextCanceled(t *testing.T) {
 	payload := []byte("a secret")
 
 	good := newECDSAKey(t)
-	jws, err := jose.ParseSigned(good.sign(t, payload))
+	jws, err := jose.ParseSigned(good.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,11 +185,11 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 
 	payload := []byte("a secret")
 
-	jws, err := jose.ParseSigned(good.sign(t, payload))
+	jws, err := jose.ParseSigned(good.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	badJWS, err := jose.ParseSigned(bad.sign(t, payload))
+	badJWS, err := jose.ParseSigned(bad.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,11 +234,11 @@ func TestRotation(t *testing.T) {
 	key2.keyID = "key2"
 
 	payload := []byte("a secret")
-	jws1, err := jose.ParseSigned(key1.sign(t, payload))
+	jws1, err := jose.ParseSigned(key1.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jws2, err := jose.ParseSigned(key2.sign(t, payload))
+	jws2, err := jose.ParseSigned(key2.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
