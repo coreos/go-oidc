@@ -39,7 +39,7 @@ oauth2Config := oauth2.Config{
     Endpoint: provider.Endpoint(),
 
     // "openid" is a required scope for OpenID Connect flows.
-    Scopes: []string{oidc.ScopeOpenID, "profile", "email"},
+    Scopes: []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail},
 }
 ```
 
