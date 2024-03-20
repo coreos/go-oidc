@@ -442,6 +442,16 @@ func (i *IDToken) Claims(v interface{}) error {
 	return json.Unmarshal(i.claims, v)
 }
 
+// WithClaims returns a new IDToken that's a clone of i, but using
+// provided claims. This is only intended for test cases or very
+// specific use cases
+func (i *IDToken) WithClaims(claims []byte) *IDToken {
+	i2 := new(IDToken)
+	*i2 = *i
+	i2.claims = claims
+	return i2
+}
+
 // VerifyAccessToken verifies that the hash of the access token that corresponds to the iD token
 // matches the hash in the id token. It returns an error if the hashes  don't match.
 // It is the caller's responsibility to ensure that the optional access token hash is present for the ID token

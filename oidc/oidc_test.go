@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 )
 
@@ -557,4 +558,15 @@ func TestUserInfoEndpoint(t *testing.T) {
 		})
 	}
 
+}
+
+func TestIDTokenWithClaims(t *testing.T) {
+	idToken := IDToken{
+		Issuer: "accounts.google.com",
+		claims: []byte(`{"iss":"accounts.google.com"}`),
+	}
+	idTokenWithClaims := idToken.WithClaims([]byte(`{"iss":"accounts.google.com","aud":"client1"}`))
+	assert.Equal(t, idToken.Issuer, idTokenWithClaims.Issuer)
+	assert.Equal(t, []byte(`{"iss":"accounts.google.com"}`), idToken.claims)
+	assert.Equal(t, []byte(`{"iss":"accounts.google.com","aud":"client1"}`), idTokenWithClaims.claims)
 }
