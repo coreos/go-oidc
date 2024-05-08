@@ -2,6 +2,10 @@ package oidc
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,7 +13,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
 	"golang.org/x/oauth2"
 )
 
@@ -555,6 +561,117 @@ func TestUserInfoEndpoint(t *testing.T) {
 				t.Errorf("expected UserInfo.EmailVerified to be %v , got %v", test.wantUserInfo.EmailVerified, info.EmailVerified)
 			}
 		})
+	}
+
+}
+
+type testIssuer struct {
+	baseURL string
+	algs    []string
+	jwks    *jose.JSONWebKeySet
+}
+
+func (t *testIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/.well-known/openid-configuration":
+		disc := struct {
+			Issuer  string   `json:"issuer"`
+			JWKSURI string   `json:"jwks_uri"`
+			Algs    []string `json:"id_token_signing_alg_values_supported"`
+		}{
+			Issuer:  t.baseURL,
+			JWKSURI: t.baseURL + "/keys",
+			Algs:    t.algs,
+		}
+		if err := json.NewEncoder(w).Encode(disc); err != nil {
+			panic("encoding discover doc: " + err.Error())
+		}
+	case "/keys":
+		if err := json.NewEncoder(w).Encode(t.jwks); err != nil {
+			panic("encoding keys: " + err.Error())
+		}
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func TestVerifierAlg(t *testing.T) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generating random key: %v", err)
+	}
+	pub := priv.Public()
+	pubKey := jose.JSONWebKey{
+		Algorithm: "ES256",
+		Key:       pub,
+		Use:       "sign",
+	}
+
+	signingKey := jose.SigningKey{
+		Algorithm: jose.ES256,
+		Key:       priv,
+	}
+
+	ts := &testIssuer{
+		algs: []string{"ES256"},
+		jwks: &jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				pubKey,
+			},
+		},
+	}
+	srv := httptest.NewServer(ts)
+	ts.baseURL = srv.URL
+
+	ctx := context.Background()
+
+	provider, err := NewProvider(ctx, srv.URL)
+	if err != nil {
+		t.Fatalf("creating provider: %v", err)
+	}
+
+	now := time.Now()
+
+	claims := struct {
+		Iss string `json:"iss"`
+		Sub string `json:"sub"`
+		Aud string `json:"aud"`
+		Exp int64  `json:"exp"`
+		Iat int64  `json:"iat"`
+	}{
+		Iss: srv.URL,
+		Sub: "test-user",
+		Aud: "test-client",
+		Exp: now.Add(time.Hour).Unix(),
+		Iat: now.Add(-time.Hour).Unix(),
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshaling claims: %v", err)
+	}
+	signer, err := jose.NewSigner(signingKey, nil)
+	if err != nil {
+		t.Fatalf("creating signing key: %v", err)
+	}
+	jws, err := signer.Sign(payload)
+	if err != nil {
+		t.Fatalf("signing token: %v", err)
+	}
+	rawIDToken, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serializing token: %v", err)
+	}
+
+	config := &Config{
+		ClientID: "test-client",
+	}
+	verifier := provider.Verifier(config)
+	idToken, err := verifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		t.Fatalf("verifying token: %v", err)
+	}
+	if idToken.Subject != "test-user" {
+		t.Errorf("expected subject 'test-user', got: %s", idToken.Subject)
 	}
 
 }
