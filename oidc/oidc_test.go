@@ -675,3 +675,84 @@ func TestVerifierAlg(t *testing.T) {
 	}
 
 }
+
+func TestCanceledContext(t *testing.T) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generating random key: %v", err)
+	}
+	pub := priv.Public()
+	pubKey := jose.JSONWebKey{
+		Algorithm: "ES256",
+		Key:       pub,
+		Use:       "sign",
+	}
+
+	signingKey := jose.SigningKey{
+		Algorithm: jose.ES256,
+		Key:       priv,
+	}
+
+	ts := &testIssuer{
+		algs: []string{"ES256"},
+		jwks: &jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				pubKey,
+			},
+		},
+	}
+	srv := httptest.NewServer(ts)
+	ts.baseURL = srv.URL
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	provider, err := NewProvider(ctx, srv.URL)
+	if err != nil {
+		t.Fatalf("creating provider: %v", err)
+	}
+
+	// Explicitly cancel the context.
+	cancel()
+
+	now := time.Now()
+
+	claims := struct {
+		Iss string `json:"iss"`
+		Sub string `json:"sub"`
+		Aud string `json:"aud"`
+		Exp int64  `json:"exp"`
+		Iat int64  `json:"iat"`
+	}{
+		Iss: srv.URL,
+		Sub: "test-user",
+		Aud: "test-client",
+		Exp: now.Add(time.Hour).Unix(),
+		Iat: now.Add(-time.Hour).Unix(),
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshaling claims: %v", err)
+	}
+	signer, err := jose.NewSigner(signingKey, nil)
+	if err != nil {
+		t.Fatalf("creating signing key: %v", err)
+	}
+	jws, err := signer.Sign(payload)
+	if err != nil {
+		t.Fatalf("signing token: %v", err)
+	}
+	rawIDToken, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serializing token: %v", err)
+	}
+
+	config := &Config{
+		ClientID: "test-client",
+	}
+	verifier := provider.Verifier(config)
+
+	ctx = context.Background()
+	if _, err := verifier.Verify(ctx, rawIDToken); err != nil {
+		t.Fatalf("verifying token: %v", err)
+	}
+}
