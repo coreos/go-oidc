@@ -131,7 +131,7 @@ func (p *Provider) VerifierContext(ctx context.Context, config *Config) *IDToken
 // The returned verifier uses a background context for all requests to the upstream
 // JWKs endpoint. To control that context, use VerifierContext instead.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
-	return p.newVerifier(p.remoteKeySet(ClientContext(context.Background(), p.client)), config)
+	return p.newVerifier(p.remoteKeySet(p.client), config)
 }
 
 func (p *Provider) newVerifier(keySet KeySet, config *Config) *IDTokenVerifier {

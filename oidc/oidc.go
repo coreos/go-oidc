@@ -116,7 +116,7 @@ type Provider struct {
 	commonRemoteKeySet KeySet
 }
 
-func (p *Provider) remoteKeySet(ctx context.Context) KeySet {
+func (p *Provider) remoteKeySet(c *http.Client) KeySet {
 	p.mu.RLock()
 	if p.commonRemoteKeySet != nil {
 		defer p.mu.RUnlock()
@@ -127,7 +127,7 @@ func (p *Provider) remoteKeySet(ctx context.Context) KeySet {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.commonRemoteKeySet = NewRemoteKeySet(ctx, p.jwksURL)
+	p.commonRemoteKeySet = NewRemoteKeySet(ClientContext(context.Background(), c), p.jwksURL)
 	return p.commonRemoteKeySet
 }
 
@@ -353,7 +353,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 	ct := resp.Header.Get("Content-Type")
 	mediaType, _, parseErr := mime.ParseMediaType(ct)
 	if parseErr == nil && mediaType == "application/jwt" {
-		payload, err := p.remoteKeySet(ctx).VerifySignature(ctx, string(body))
+		payload, err := p.remoteKeySet(getClient(ctx)).VerifySignature(ctx, string(body))
 		if err != nil {
 			return nil, fmt.Errorf("oidc: invalid userinfo jwt signature %v", err)
 		}
