@@ -344,6 +344,86 @@ func TestNewProvider(t *testing.T) {
 	}
 }
 
+func TestProviderConfigJSON(t *testing.T) {
+	// https://accounts.google.com/.well-known/openid-configuration
+	testCase := `
+{
+ "issuer": "https://accounts.google.com",
+ "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+ "device_authorization_endpoint": "https://oauth2.googleapis.com/device/code",
+ "token_endpoint": "https://oauth2.googleapis.com/token",
+ "userinfo_endpoint": "https://openidconnect.googleapis.com/v1/userinfo",
+ "revocation_endpoint": "https://oauth2.googleapis.com/revoke",
+ "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+ "response_types_supported": [
+  "code",
+  "token",
+  "id_token",
+  "code token",
+  "code id_token",
+  "token id_token",
+  "code token id_token",
+  "none"
+ ],
+ "subject_types_supported": [
+  "public"
+ ],
+ "id_token_signing_alg_values_supported": [
+  "RS256"
+ ],
+ "scopes_supported": [
+  "openid",
+  "email",
+  "profile"
+ ],
+ "token_endpoint_auth_methods_supported": [
+  "client_secret_post",
+  "client_secret_basic"
+ ],
+ "claims_supported": [
+  "aud",
+  "email",
+  "email_verified",
+  "exp",
+  "family_name",
+  "given_name",
+  "iat",
+  "iss",
+  "name",
+  "picture",
+  "sub"
+ ],
+ "code_challenge_methods_supported": [
+  "plain",
+  "S256"
+ ],
+ "grant_types_supported": [
+  "authorization_code",
+  "refresh_token",
+  "urn:ietf:params:oauth:grant-type:device_code",
+  "urn:ietf:params:oauth:grant-type:jwt-bearer"
+ ]
+}
+`
+	config := &ProviderConfig{}
+	if err := json.Unmarshal([]byte(testCase), config); err != nil {
+		t.Fatalf("Parsing provider config: %v", err)
+	}
+
+	want := &ProviderConfig{
+		IssuerURL:     "https://accounts.google.com",
+		AuthURL:       "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:      "https://oauth2.googleapis.com/token",
+		DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+		UserInfoURL:   "https://openidconnect.googleapis.com/v1/userinfo",
+		JWKSURL:       "https://www.googleapis.com/oauth2/v3/certs",
+		Algorithms:    []string{"RS256"},
+	}
+	if !reflect.DeepEqual(config, want) {
+		t.Errorf("Parsing provider config returned unexpected result, got=%#v, want=%#v", config, want)
+	}
+}
+
 func TestGetClient(t *testing.T) {
 	ctx := context.Background()
 	if c := getClient(ctx); c != nil {
