@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	jose "gopkg.in/square/go-jose.v2"
+	jose "gopkg.in/go-jose/go-jose.v2"
 )
 
 const (
