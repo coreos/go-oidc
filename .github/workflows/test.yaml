@@ -1,0 +1,32 @@
+name: test
+on: 
+  push:
+    branches:
+      - v2
+  pull_request:
+    branches:
+      - v2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.22', '1.23']
+    name: Linux Go ${{ matrix.go }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+      # For awkward reasons we can't actually add a go.mod file for the v2
+      # branch, because Go enforces that a "v2.x.x" tag has a "v2" prefix.
+      #
+      # https://github.com/coreos/go-oidc/issues/230
+    - name: Setup go module
+      run: go mod init github.com/coreos/go-oidc
+    - name: Go get
+      run: go get ./...
+    - name: Test
+      run: go test -v ./...
