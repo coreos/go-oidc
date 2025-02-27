@@ -12,15 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.21", "1.22", "1.23"]
+        go: ['1.21', '1.22', '1.23']
     name: Linux Go ${{ matrix.go }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go }}
-      - name: Test
-        run: go test -v ./...
-      - name: Staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@2023.1.7 ./...
+    - uses: actions/checkout@v4
+    - name: Setup go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+    - name: Test
+      run: go test -v ./...
+    - name: Staticcheck
+      run: go run honnef.co/go/tools/cmd/staticcheck@2023.1.7 ./...
