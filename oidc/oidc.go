@@ -162,7 +162,7 @@ var supportedAlgorithms = map[string]bool{
 // parsing.
 //
 //	// Directly fetch the metadata document.
-// 	resp, err := http.Get("https://login.example.com/custom-metadata-path")
+//	resp, err := http.Get("https://login.example.com/custom-metadata-path")
 //	if err != nil {
 //		// ...
 //	}
@@ -236,7 +236,19 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 //
 // See: https://openid.net/specs/openid-connect-discovery-1_0.html
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
-	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
+	return NewProviderWithBaseUrl(ctx, "", issuer)
+}
+
+// NewProviderWithBaseUrl uses the OpenID Connect discovery mechanism to construct a Provider.
+//
+// An identity provider may report its issuer as a path rather than a full URL. This is not spec
+// conformant, but for example the case with Hashicorp Vault (e.g. /v1/identity/oidc/provider/default)
+//
+// With this constructor, discovery can still be used with a combination of baseUrl and issuer.
+//
+// See: https://openid.net/specs/openid-connect-discovery-1_0.html
+func NewProviderWithBaseUrl(ctx context.Context, baseUrl, issuer string) (*Provider, error) {
+	wellKnown := baseUrl + strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	req, err := http.NewRequest("GET", wellKnown, nil)
 	if err != nil {
 		return nil, err
@@ -275,20 +287,28 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 			algs = append(algs, a)
 		}
 	}
+
+	withBaseUrl := func(val string) string {
+		if val != "" && !strings.HasPrefix(val, "http") {
+			val = baseUrl + val
+		}
+		return val
+	}
+
 	return &Provider{
 		issuer:        issuerURL,
-		authURL:       p.AuthURL,
-		tokenURL:      p.TokenURL,
-		deviceAuthURL: p.DeviceAuthURL,
-		userInfoURL:   p.UserInfoURL,
-		jwksURL:       p.JWKSURL,
+		authURL:       withBaseUrl(p.AuthURL),
+		tokenURL:      withBaseUrl(p.TokenURL),
+		deviceAuthURL: withBaseUrl(p.DeviceAuthURL),
+		userInfoURL:   withBaseUrl(p.UserInfoURL),
+		jwksURL:       withBaseUrl(p.JWKSURL),
 		algorithms:    algs,
 		rawClaims:     body,
 		client:        getClient(ctx),
 	}, nil
 }
 
-// Claims unmarshals raw fields returned by the server during discovery.
+// Claims unmarshalls raw fields returned by the server during discovery.
 //
 //	var claims struct {
 //	    ScopesSupported []string `json:"scopes_supported"`
