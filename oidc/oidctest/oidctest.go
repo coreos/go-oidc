@@ -26,14 +26,14 @@
 //
 // Then sign a token:
 //
-// 	rawClaims := `{
-// 		"iss": "` + srv.URL + `",
-// 		"aud": "my-client-id",
-// 		"sub": "foo",
-// 		"email": "foo@example.com",
-// 		"email_verified": true
-// 	}`
-// 	token := oidctest.SignIDToken(priv, "my-key-id", oidc.RS256, rawClaims)
+//	rawClaims := `{
+//		"iss": "` + srv.URL + `",
+//		"aud": "my-client-id",
+//		"sub": "foo",
+//		"email": "foo@example.com",
+//		"email_verified": true
+//	}`
+//	token := oidctest.SignIDToken(priv, "my-key-id", oidc.RS256, rawClaims)
 //
 // And finaly, verify through the oidc package:
 //
@@ -61,7 +61,7 @@ import (
 	"net/http"
 	"net/url"
 
-	jose "github.com/go-jose/go-jose/v3"
+	jose "github.com/go-jose/go-jose/v4"
 )
 
 // SignIDToken uses a private key to sign provided claims.
