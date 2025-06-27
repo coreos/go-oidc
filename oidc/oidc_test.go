@@ -783,8 +783,8 @@ func TestCanceledContext(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(ts)
-	ts.baseURL = srv.URL
 	defer srv.Close()
+	ts.baseURL = srv.URL
 
 	ctx, cancel := context.WithCancel(context.Background())
 
