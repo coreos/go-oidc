@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -116,17 +117,18 @@ func TestAccessTokenVerification(t *testing.T) {
 
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
-		name              string
-		data              string
-		issuerURLOverride string
-		trailingSlash     bool
-		wantAuthURL       string
-		wantTokenURL      string
-		wantDeviceAuthURL string
-		wantUserInfoURL   string
-		wantIssuerURL     string
-		wantAlgorithms    []string
-		wantErr           bool
+		name                  string
+		data                  string
+		issuerURLOverride     string
+		trailingSlash         bool
+		wantAuthURL           string
+		wantTokenURL          string
+		wantDeviceAuthURL     string
+		wantUserInfoURL       string
+		wantIssuerURL         string
+		wantAlgorithms        []string
+		wantErr               bool
+		wantErrIssuerMismatch bool
 	}{
 		{
 			name: "basic_case",
@@ -306,13 +308,19 @@ func TestNewProvider(t *testing.T) {
 
 			p, err := NewProvider(ctx, issuer)
 			if err != nil {
-				if !test.wantErr {
+				if !test.wantErr && !test.wantErrIssuerMismatch {
 					t.Errorf("NewProvider() failed: %v", err)
 				}
 				return
 			}
-			if test.wantErr {
+			if test.wantErr || test.wantErrIssuerMismatch {
 				t.Fatalf("NewProvider(): expected error")
+			}
+			if test.wantErrIssuerMismatch {
+				var errExp *IssuerMismatchError
+				if !errors.As(err, &errExp) {
+					t.Errorf("expected *IssuerMismatchError but got %q", err)
+				}
 			}
 
 			if test.wantIssuerURL != "" && p.issuer != test.wantIssuerURL {
