@@ -40,6 +40,16 @@ var (
 	errInvalidAtHash = errors.New("access token hash does not match value in ID token")
 )
 
+// IssuerMismatchError is returned when the issuer does not match the expected value.
+type IssuerMismatchError struct {
+	Expected string
+	Actual   string
+}
+
+func (e *IssuerMismatchError) Error() string {
+	return fmt.Sprintf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", e.Expected, e.Actual)
+}
+
 type contextKey int
 
 var issuerURLKey contextKey
@@ -162,7 +172,7 @@ var supportedAlgorithms = map[string]bool{
 // parsing.
 //
 //	// Directly fetch the metadata document.
-// 	resp, err := http.Get("https://login.example.com/custom-metadata-path")
+//	resp, err := http.Get("https://login.example.com/custom-metadata-path")
 //	if err != nil {
 //		// ...
 //	}
@@ -267,7 +277,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		issuerURL = issuer
 	}
 	if p.Issuer != issuerURL && !skipIssuerValidation {
-		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
+		return nil, &IssuerMismatchError{Expected: issuer, Actual: p.Issuer}
 	}
 	var algs []string
 	for _, a := range p.Algorithms {
