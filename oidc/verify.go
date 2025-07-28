@@ -3,13 +3,11 @@ package oidc
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -145,18 +143,6 @@ func (p *Provider) newVerifier(keySet KeySet, config *Config) *IDTokenVerifier {
 	return NewVerifier(p.issuer, keySet, config)
 }
 
-func parseJWT(p string) ([]byte, error) {
-	parts := strings.Split(p, ".")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("oidc: malformed jwt, expected 3 parts got %d", len(parts))
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt payload: %v", err)
-	}
-	return payload, nil
-}
-
 func contains(sli []string, ele string) bool {
 	for _, s := range sli {
 		if s == ele {
@@ -221,10 +207,32 @@ func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
 	// us do cheap checks before possibly re-syncing keys.
-	payload, err := parseJWT(rawIDToken)
+	var supportedSigAlgs []jose.SignatureAlgorithm
+	for _, alg := range v.config.SupportedSigningAlgs {
+		supportedSigAlgs = append(supportedSigAlgs, jose.SignatureAlgorithm(alg))
+	}
+	if len(supportedSigAlgs) == 0 {
+		// If no algorithms were specified by both the config and discovery, default
+		// to the one mandatory algorithm "RS256".
+		supportedSigAlgs = []jose.SignatureAlgorithm{jose.RS256}
+	}
+	if v.config.InsecureSkipSignatureCheck {
+		supportedSigAlgs = append(supportedSigAlgs, jose.SignatureAlgorithm("none"))
+	}
+	jws, err := jose.ParseSigned(rawIDToken, supportedSigAlgs)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
+
+	switch len(jws.Signatures) {
+	case 0:
+		return nil, fmt.Errorf("oidc: id token not signed")
+	case 1:
+	default:
+		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
+	}
+
+	payload := jws.UnsafePayloadWithoutVerification()
 	var token idToken
 	if err := json.Unmarshal(payload, &token); err != nil {
 		return nil, fmt.Errorf("oidc: failed to unmarshal claims: %v", err)
@@ -310,27 +318,6 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		return t, nil
 	}
 
-	var supportedSigAlgs []jose.SignatureAlgorithm
-	for _, alg := range v.config.SupportedSigningAlgs {
-		supportedSigAlgs = append(supportedSigAlgs, jose.SignatureAlgorithm(alg))
-	}
-	if len(supportedSigAlgs) == 0 {
-		// If no algorithms were specified by both the config and discovery, default
-		// to the one mandatory algorithm "RS256".
-		supportedSigAlgs = []jose.SignatureAlgorithm{jose.RS256}
-	}
-	jws, err := jose.ParseSigned(rawIDToken, supportedSigAlgs)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
-	}
-
-	switch len(jws.Signatures) {
-	case 0:
-		return nil, fmt.Errorf("oidc: id token not signed")
-	case 1:
-	default:
-		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
-	}
 	sig := jws.Signatures[0]
 	t.sigAlgorithm = sig.Header.Algorithm
 

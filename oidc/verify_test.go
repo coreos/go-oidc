@@ -580,9 +580,10 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 	if v.signKey != nil {
 		token = v.signKey.sign(t, []byte(v.idToken))
 	} else {
-		token = base64.RawURLEncoding.EncodeToString([]byte(`{alg: "none"}`))
+		token = base64.RawURLEncoding.EncodeToString([]byte(`{"alg": "none"}`))
 		token += "."
 		token += base64.RawURLEncoding.EncodeToString([]byte(v.idToken))
+		token += "."
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
