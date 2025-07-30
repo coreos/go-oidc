@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -151,11 +152,8 @@ func TestKeyVerifyContextCanceled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ch := make(chan struct{})
-	defer close(ch)
-
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-ch
+		io.WriteString(w, "{}")
 	}))
 	defer s.Close()
 

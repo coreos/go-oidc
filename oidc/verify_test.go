@@ -580,9 +580,14 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 	if v.signKey != nil {
 		token = v.signKey.sign(t, []byte(v.idToken))
 	} else {
-		token = base64.RawURLEncoding.EncodeToString([]byte(`{alg: "none"}`))
+		// "none" still uses a second "." character, but "...MUST use the empty octet
+		// sequence as its JWS Signature value."
+		//
+		// https://datatracker.ietf.org/doc/html/rfc7518#section-3.6
+		token = base64.RawURLEncoding.EncodeToString([]byte(`{"alg": "none"}`))
 		token += "."
 		token += base64.RawURLEncoding.EncodeToString([]byte(v.idToken))
+		token += "."
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
