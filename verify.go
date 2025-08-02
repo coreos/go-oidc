@@ -1,11 +1,9 @@
 package oidc
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -211,12 +209,29 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
 
-	// Throw out tokens with invalid claims before trying to verify the token. This lets
-	// us do cheap checks before possibly re-syncing keys.
-	payload, err := parseJWT(rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
+	switch len(jws.Signatures) {
+	case 0:
+		return nil, fmt.Errorf("oidc: id token not signed")
+	case 1:
+	default:
+		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
 	}
+
+	sig := jws.Signatures[0]
+	supportedSigAlgs := v.config.SupportedSigningAlgs
+	if len(supportedSigAlgs) == 0 {
+		supportedSigAlgs = []string{RS256}
+	}
+
+	if !contains(supportedSigAlgs, sig.Header.Algorithm) {
+		return nil, fmt.Errorf("oidc: id token signed with unsupported algorithm, expected %q got %q", supportedSigAlgs, sig.Header.Algorithm)
+	}
+
+	payload, err := v.keySet.VerifySignature(ctx, rawIDToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify signature: %v", err)
+	}
+
 	var token idToken
 	if err := json.Unmarshal(payload, &token); err != nil {
 		return nil, fmt.Errorf("oidc: failed to unmarshal claims: %v", err)
@@ -296,36 +311,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		}
 	}
 
-	switch len(jws.Signatures) {
-	case 0:
-		return nil, fmt.Errorf("oidc: id token not signed")
-	case 1:
-	default:
-		return nil, fmt.Errorf("oidc: multiple signatures on id token not supported")
-	}
-
-	sig := jws.Signatures[0]
-	supportedSigAlgs := v.config.SupportedSigningAlgs
-	if len(supportedSigAlgs) == 0 {
-		supportedSigAlgs = []string{RS256}
-	}
-
-	if !contains(supportedSigAlgs, sig.Header.Algorithm) {
-		return nil, fmt.Errorf("oidc: id token signed with unsupported algorithm, expected %q got %q", supportedSigAlgs, sig.Header.Algorithm)
-	}
-
 	t.sigAlgorithm = sig.Header.Algorithm
-
-	gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify signature: %v", err)
-	}
-
-	// Ensure that the payload returned by the square actually matches the payload parsed earlier.
-	if !bytes.Equal(gotPayload, payload) {
-		return nil, errors.New("oidc: internal error, payload parsed did not match previous payload")
-	}
-
 	return t, nil
 }
 
