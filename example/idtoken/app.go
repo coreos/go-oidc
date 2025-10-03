@@ -4,6 +4,7 @@ This is an example application to demonstrate parsing an ID Token.
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
 
