@@ -325,6 +325,10 @@ type UserInfo struct {
 	Profile       string `json:"profile"`
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
+	Picture       string `json:"picture"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
 
 	claims []byte
 }
@@ -337,6 +341,12 @@ type userInfoRaw struct {
 	// https://forums.aws.amazon.com/thread.jspa?messageID=949441&#949441 and
 	// https://discuss.elastic.co/t/openid-error-after-authenticating-against-aws-cognito/206018/11
 	EmailVerified stringAsBool `json:"email_verified"`
+	// Align the fields in the OpenID example
+	//https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
+	Name       string `json:"name"`
+	Picture    string `json:"picture"`
+	GivenName  string `json:"given_name"`
+	FamilyName string `json:"family_name"`
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -397,6 +407,10 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		Email:         userInfo.Email,
 		EmailVerified: bool(userInfo.EmailVerified),
 		claims:        body,
+		Name:          userInfo.Name,
+		Picture:       userInfo.Picture,
+		GivenName:     userInfo.GivenName,
+		FamilyName:    userInfo.FamilyName,
 	}, nil
 }
 
