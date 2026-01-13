@@ -202,6 +202,15 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 //
 //	token, err := verifier.Verify(ctx, rawIDToken)
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
+	if strings.Count(rawIDToken, ".") > 2 {
+		// Older versions of go-jose are vulnerable to a scenario where
+		// strings.Cut(token, ".") can lead to excessive allocations. Since the
+		// "v2" branch of this repo explicitly doesn't update its dependencies
+		// at the request of Kubernetes, add a check here first.
+		//
+		// https://github.com/go-jose/go-jose/security/advisories/GHSA-c6gw-w398-hv78
+		return nil, fmt.Errorf("oidc: malformed jwt")
+	}
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
