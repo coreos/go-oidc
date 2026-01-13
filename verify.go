@@ -50,19 +50,18 @@ type IDTokenVerifier struct {
 // This constructor can be used to create a verifier directly using the issuer URL and
 // JSON Web Key Set URL without using discovery:
 //
-//		keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
-//		verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
+//	keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
+//	verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 //
 // Since KeySet is an interface, this constructor can also be used to supply custom
 // public key sources. For example, if a user wanted to supply public keys out-of-band
 // and hold them statically in-memory:
 //
-//		// Custom KeySet implementation.
-//		keySet := newStatisKeySet(publicKeys...)
+//	// Custom KeySet implementation.
+//	keySet := newStatisKeySet(publicKeys...)
 //
-//		// Verifier uses the custom KeySet implementation.
-//		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
-//
+//	// Verifier uses the custom KeySet implementation.
+//	verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
 func NewVerifier(issuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
 	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL}
 }
@@ -190,19 +189,18 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 //
-//    oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
-//    if err != nil {
-//        // handle error
-//    }
+//	oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
+//	if err != nil {
+//	    // handle error
+//	}
 //
-//    // Extract the ID Token from oauth2 token.
-//    rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-//    if !ok {
-//        // handle error
-//    }
+//	// Extract the ID Token from oauth2 token.
+//	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+//	if !ok {
+//	    // handle error
+//	}
 //
-//    token, err := verifier.Verify(ctx, rawIDToken)
-//
+//	token, err := verifier.Verify(ctx, rawIDToken)
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
 	jws, err := jose.ParseSigned(rawIDToken)
 	if err != nil {
