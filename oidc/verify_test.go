@@ -193,6 +193,67 @@ func TestVerifyAudience(t *testing.T) {
 	}
 }
 
+func TestVerifyAuthorizedParty(t *testing.T) {
+	tests := []verificationTest{
+		{
+			name:    "multi audience requires azp when enabled",
+			idToken: `{"iss":"https://foo","aud":["client1","client2"]}`,
+			config: Config{
+				ClientID:              "client2",
+				SkipExpiryCheck:       true,
+				VerifyAuthorizedParty: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "multi audience azp mismatch rejected when enabled",
+			idToken: `{"iss":"https://foo","aud":["client1","client2"],"azp":"client1"}`,
+			config: Config{
+				ClientID:              "client2",
+				SkipExpiryCheck:       true,
+				VerifyAuthorizedParty: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "multi audience azp match accepted when enabled",
+			idToken: `{"iss":"https://foo","aud":["client1","client2"],"azp":"client2"}`,
+			config: Config{
+				ClientID:              "client2",
+				SkipExpiryCheck:       true,
+				VerifyAuthorizedParty: true,
+			},
+			signKey: newRSAKey(t),
+		},
+		{
+			name:    "single audience azp mismatch rejected when enabled",
+			idToken: `{"iss":"https://foo","aud":"client2","azp":"client1"}`,
+			config: Config{
+				ClientID:              "client2",
+				SkipExpiryCheck:       true,
+				VerifyAuthorizedParty: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "single audience azp match accepted when enabled",
+			idToken: `{"iss":"https://foo","aud":"client2","azp":"client2"}`,
+			config: Config{
+				ClientID:              "client2",
+				SkipExpiryCheck:       true,
+				VerifyAuthorizedParty: true,
+			},
+			signKey: newRSAKey(t),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, test.run)
+	}
+}
+
 func TestVerifySigningAlg(t *testing.T) {
 	tests := []verificationTest{
 		{

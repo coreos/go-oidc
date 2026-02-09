@@ -100,6 +100,17 @@ type Config struct {
 	// this option.
 	SkipIssuerCheck bool
 
+	// VerifyAuthorizedParty enables validation of the "azp" (authorized party) claim
+	// against the configured ClientID.
+	//
+	// When enabled:
+	//   - if "aud" contains multiple values, "azp" must be present and equal to ClientID
+	//   - if "azp" is present, it must be equal to ClientID
+	//
+	// This is disabled by default because IDTokenVerifier can be used by parties other
+	// than the client that initiated the OpenID Connect flow.
+	VerifyAuthorizedParty bool
+
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
 
@@ -300,6 +311,20 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 			}
 		} else {
 			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")
+		}
+	}
+
+	if v.config.VerifyAuthorizedParty {
+		if v.config.ClientID == "" {
+			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided when VerifyAuthorizedParty is set")
+		}
+
+		if len(t.Audience) > 1 && token.AuthorizedParty == "" {
+			return nil, fmt.Errorf("oidc: expected authorized party (azp) claim when audience contains multiple values")
+		}
+
+		if token.AuthorizedParty != "" && token.AuthorizedParty != v.config.ClientID {
+			return nil, fmt.Errorf("oidc: expected authorized party (azp) %q got %q", v.config.ClientID, token.AuthorizedParty)
 		}
 	}
 
