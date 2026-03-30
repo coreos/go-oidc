@@ -237,6 +237,12 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 // See: https://openid.net/specs/openid-connect-discovery-1_0.html
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
+
+	// Some IDP providers (e.g. fusionauth.io) their issuer do not have `https://` prefix
+	if !strings.HasPrefix(issuer, "http") {
+		wellKnown = "https://" + wellKnown
+	}
+
 	req, err := http.NewRequest("GET", wellKnown, nil)
 	if err != nil {
 		return nil, err
