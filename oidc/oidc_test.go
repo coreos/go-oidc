@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -341,6 +342,45 @@ func TestNewProvider(t *testing.T) {
 					p.algorithms, test.wantAlgorithms)
 			}
 		})
+	}
+}
+
+func TestNewProviderIssuerMismatchTypedError(t *testing.T) {
+	const discovered = "https://example.com"
+	disco := fmt.Sprintf(`{
+		"issuer": %q,
+		"authorization_endpoint": "https://example.com/auth",
+		"token_endpoint": "https://example.com/token",
+		"jwks_uri": "https://example.com/keys",
+		"id_token_signing_alg_values_supported": ["RS256"]
+	}`, discovered)
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/.well-known/openid-configuration" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(disco))
+	}))
+	defer s.Close()
+
+	_, err := NewProvider(context.Background(), s.URL)
+	if err == nil {
+		t.Fatal("expected NewProvider to return an error for mismatched issuer")
+	}
+	if !errors.Is(err, ErrIssuerMismatch) {
+		t.Errorf("errors.Is(err, ErrIssuerMismatch) = false, want true; err = %v", err)
+	}
+	var mismatch *IssuerMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("errors.As did not unwrap to *IssuerMismatchError; err = %v", err)
+	}
+	if mismatch.Provided != s.URL {
+		t.Errorf("Provided = %q, want %q", mismatch.Provided, s.URL)
+	}
+	if mismatch.Discovered != discovered {
+		t.Errorf("Discovered = %q, want %q", mismatch.Discovered, discovered)
 	}
 }
 

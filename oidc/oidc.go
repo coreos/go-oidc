@@ -40,6 +40,31 @@ var (
 	errInvalidAtHash = errors.New("access token hash does not match value in ID token")
 )
 
+// ErrIssuerMismatch is returned by NewProvider when the issuer URL the client
+// dialed doesn't match the one published by the discovery document. It's a
+// sentinel for use with errors.Is. Callers that need the offending values
+// can errors.As into [*IssuerMismatchError].
+var ErrIssuerMismatch = errors.New("oidc: issuer URL did not match the issuer URL returned by provider")
+
+// IssuerMismatchError captures the discovery-time issuer mismatch and the
+// two values involved. Its Error string matches the legacy message format
+// for backwards compatibility.
+type IssuerMismatchError struct {
+	// Provided is the issuer URL the client used to dial discovery.
+	Provided string
+	// Discovered is the issuer URL the provider's discovery document returned.
+	Discovered string
+}
+
+func (e *IssuerMismatchError) Error() string {
+	return fmt.Sprintf("oidc: issuer URL provided to client (%q) did not match the issuer URL returned by provider (%q)", e.Provided, e.Discovered)
+}
+
+// Is reports whether target is [ErrIssuerMismatch].
+func (e *IssuerMismatchError) Is(target error) bool {
+	return target == ErrIssuerMismatch
+}
+
 type contextKey int
 
 var issuerURLKey contextKey
@@ -267,7 +292,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		issuerURL = issuer
 	}
 	if p.Issuer != issuerURL && !skipIssuerValidation {
-		return nil, fmt.Errorf("oidc: issuer URL provided to client (%q) did not match the issuer URL returned by provider (%q)", issuer, p.Issuer)
+		return nil, &IssuerMismatchError{Provided: issuer, Discovered: p.Issuer}
 	}
 	var algs []string
 	for _, a := range p.Algorithms {
