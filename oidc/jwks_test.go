@@ -254,11 +254,14 @@ func TestRotation(t *testing.T) {
 	s := httptest.NewServer(server)
 	defer s.Close()
 
+	fakeNow := time.Now()
 	rks := newRemoteKeySet(ctx, s.URL)
+	rks.now = func() time.Time { return fakeNow }
 
 	if _, err := rks.verify(ctx, jws1); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
 	}
+	fakeNow = fakeNow.Add(remoteKeyFetchInterval)
 	if _, err := rks.verify(ctx, jws2); err == nil {
 		t.Errorf("incorrectly verified signature")
 	}
@@ -267,6 +270,9 @@ func TestRotation(t *testing.T) {
 	server.keys = jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{key1.jwk(), key2.jwk()},
 	}
+
+	// Advance time past the rate-limit window so the next miss triggers a fetch.
+	fakeNow = fakeNow.Add(remoteKeyFetchInterval)
 
 	if _, err := rks.verify(ctx, jws1); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
@@ -283,6 +289,64 @@ func TestRotation(t *testing.T) {
 	}
 	if _, err := rks.verify(ctx, jws2); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
+	}
+}
+
+func TestRemoteKeySetRateLimit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	key := newRSAKey(t)
+	key.keyID = "known"
+
+	unknown := newRSAKey(t)
+	unknown.keyID = "unknown"
+
+	payload := []byte("test payload")
+	jwsUnknown, err := jose.ParseSigned(unknown.sign(t, payload), allAlgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fetchCount := 0
+	server := &keyServer{keys: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key.jwk()}}}
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fetchCount++
+		server.ServeHTTP(w, r)
+	}))
+	defer s.Close()
+
+	fakeNow := time.Now()
+	rks := newRemoteKeySet(ctx, s.URL)
+	rks.now = func() time.Time { return fakeNow }
+
+	// First verify with unknown kid
+	// triggers one remote fetch, returns cache-miss error.
+	if _, err := rks.verify(ctx, jwsUnknown); err == nil {
+		t.Fatal("expected verification failure for unknown kid")
+	}
+	if fetchCount != 1 {
+		t.Fatalf("expected 1 fetch, got %d", fetchCount)
+	}
+
+	// Repeated verifies with unknown kid within the rate-limit window must not
+	// trigger additional fetches.
+	for i := 0; i < 10; i++ {
+		if _, err := rks.verify(ctx, jwsUnknown); err == nil {
+			t.Fatal("expected verification failure for unknown kid")
+		}
+	}
+	if fetchCount != 1 {
+		t.Fatalf("expected still 1 fetch after rapid retries, got %d", fetchCount)
+	}
+
+	// After the window expires a new fetch is allowed.
+	fakeNow = fakeNow.Add(remoteKeyFetchInterval)
+	if _, err := rks.verify(ctx, jwsUnknown); err == nil {
+		t.Fatal("expected verification failure for unknown kid")
+	}
+	if fetchCount != 2 {
+		t.Fatalf("expected 2 fetches after interval elapsed, got %d", fetchCount)
 	}
 }
 

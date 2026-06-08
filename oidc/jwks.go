@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
 )
@@ -72,6 +73,11 @@ func newRemoteKeySet(ctx context.Context, jwksURL string) *RemoteKeySet {
 	}
 }
 
+// remoteKeyFetchInterval is the minimum time between remote JWKS fetches.
+// It caps how often unknown key IDs can trigger HTTP GETs, preventing remote
+// endpoint flooding from JWTs carrying arbitrary kid values.
+const remoteKeyFetchInterval = 30 * time.Second
+
 // RemoteKeySet is a KeySet implementation that validates JSON web tokens against
 // a jwks_uri endpoint.
 type RemoteKeySet struct {
@@ -89,6 +95,19 @@ type RemoteKeySet struct {
 
 	// A set of cached keys.
 	cachedKeys []jose.JSONWebKey
+
+	// lastFetch records when the most recent remote fetch was initiated.
+	lastFetch time.Time
+
+	// now returns the current time. Defaults to time.Now; overridable in tests.
+	now func() time.Time
+}
+
+func (r *RemoteKeySet) timeNow() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
 }
 
 // inflight is used to wait on some in-flight request from multiple goroutines.
@@ -193,11 +212,23 @@ func (r *RemoteKeySet) keysFromCache() (keys []jose.JSONWebKey) {
 
 // keysFromRemote syncs the key set from the remote set, records the values in the
 // cache, and returns the key set.
+//
+// At most one remote fetch is initiated per remoteKeyFetchInterval. When a
+// fetch was performed recently, the cached keys are returned immediately to
+// bound how often unknown kid values can cause outbound HTTP GETs.
 func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, error) {
 	// Need to lock to inspect the inflight request field.
 	r.mu.Lock()
 	// If there's not a current inflight request, create one.
 	if r.inflight == nil {
+		// Rate-limit: if a fetch was started within the last interval, return
+		// the cached keys without hitting the remote.
+		if now := r.timeNow(); !r.lastFetch.IsZero() && now.Sub(r.lastFetch) < remoteKeyFetchInterval {
+			keys := r.cachedKeys
+			r.mu.Unlock()
+			return keys, nil
+		}
+		r.lastFetch = r.timeNow()
 		r.inflight = newInflight()
 
 		// This goroutine has exclusive ownership over the current inflight
