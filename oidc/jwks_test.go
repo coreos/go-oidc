@@ -286,6 +286,46 @@ func TestRotation(t *testing.T) {
 	}
 }
 
+func TestUpdateKeysSendsCacheControlNoCache(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	key := newRSAKey(t)
+	var requestHeaders []http.Header
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestHeaders = append(requestHeaders, r.Header.Clone())
+		if err := json.NewEncoder(w).Encode(jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{key.jwk()},
+		}); err != nil {
+			panic(err)
+		}
+	}))
+	defer s.Close()
+
+	rks := newRemoteKeySet(ctx, s.URL)
+
+	payload := []byte("a secret")
+	jws, err := jose.ParseSigned(key.sign(t, payload), allAlgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := rks.verify(ctx, jws); err != nil {
+		t.Fatalf("failed to verify: %v", err)
+	}
+
+	if len(requestHeaders) == 0 {
+		t.Fatal("expected at least one request to the JWKS endpoint")
+	}
+	for i, h := range requestHeaders {
+		if got := h.Get("Cache-Control"); got != "no-cache" {
+			t.Errorf("request %d: expected Cache-Control: no-cache, got %q", i, got)
+		}
+	}
+}
+
+
 func BenchmarkVerify(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
