@@ -17,8 +17,8 @@ import (
 
 // StaticKeySet is a verifier that validates JWT against a static set of public keys.
 type StaticKeySet struct {
-	// PublicKeys used to verify the JWT. Supported types are *rsa.PublicKey and
-	// *ecdsa.PublicKey.
+	// PublicKeys used to verify the JWT. Supported types are *rsa.PublicKey,
+	// *ecdsa.PublicKey, and ed25519.PublicKey.
 	PublicKeys []crypto.PublicKey
 }
 
@@ -53,8 +53,10 @@ func (s *StaticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 // exposed for providers that don't support discovery or to prevent round trips to the
 // discovery URL.
 //
-// The returned KeySet is a long lived verifier that caches keys based on any
-// keys change. Reuse a common remote key set instead of creating new ones as needed.
+// The returned KeySet is a long lived verifier that caches keys in memory,
+// re-fetching from the remote URL when it encounters a key ID it hasn't seen.
+// Reuse a single remote key set rather than creating a new one for each
+// verification.
 func NewRemoteKeySet(ctx context.Context, jwksURL string) *RemoteKeySet {
 	return newRemoteKeySet(ctx, jwksURL)
 }
@@ -123,7 +125,7 @@ func (i *inflight) result() ([]jose.JSONWebKey, error) {
 	return i.keys, i.err
 }
 
-// paresdJWTKey is a context key that allows common setups to avoid parsing the
+// parsedJWTKey is a context key that allows common setups to avoid parsing the
 // JWT twice. It holds a *jose.JSONWebSignature value.
 var parsedJWTKey contextKey
 

@@ -38,7 +38,7 @@ type LogoutToken struct {
 	Expiry time.Time
 	// Optional session ID claim ("sid").
 	//
-	// The exact semantics of session IDs very between identity providers. Use
+	// The exact semantics of session IDs vary between identity providers. Use
 	// your provider's documentation to determine what this correlates to and
 	// how it should be handled.
 	SessionID string
@@ -99,7 +99,7 @@ type logoutTokenJSON struct {
 //	}
 //	verifier := provider.Verifier(oidcConfig)
 //
-//	mux.HandleFunc("POST /logout", func(w http.ResponseWriter, r *http.Reequest) {
+//	mux.HandleFunc("POST /logout", func(w http.ResponseWriter, r *http.Request) {
 //		rawLogoutToken := r.PostFormValue("logout_token")
 //		if rawLogoutToken == "" {
 //			// ...
