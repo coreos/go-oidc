@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -142,15 +143,6 @@ func (p *Provider) newVerifier(keySet KeySet, config *Config) *IDTokenVerifier {
 	return NewVerifier(p.issuer, keySet, config)
 }
 
-func contains(sli []string, ele string) bool {
-	for _, s := range sli {
-		if s == ele {
-			return true
-		}
-	}
-	return false
-}
-
 // Returns the Claims from the distributed JWT token
 func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src claimSource) ([]byte, error) {
 	req, err := http.NewRequest("GET", src.Endpoint, nil)
@@ -257,7 +249,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 	// This check DOES NOT ensure that the ClientID is the party to which the ID Token was issued (i.e. Authorized party).
 	if !v.config.SkipClientIDCheck {
 		if v.config.ClientID != "" {
-			if !contains(t.Audience, v.config.ClientID) {
+			if !slices.Contains(t.Audience, v.config.ClientID) {
 				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
 			}
 		} else {
