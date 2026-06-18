@@ -18,10 +18,10 @@ const (
 	issuerGoogleAccountsNoScheme = "accounts.google.com"
 )
 
-// TokenExpiredError indicates that Verify or VerifyLogout failed because the
-// token was expired. This error does NOT indicate that the token is not also
-// invalid for other reasons. Other checks might have failed if the expiration
-// check had not failed.
+// TokenExpiredError indicates that [IDTokenVerifier.Verify] or
+// [IDTokenVerifier.VerifyLogout] failed because the token was expired. This
+// error does NOT indicate that the token is not also invalid for other reasons.
+// Other checks might have failed if the expiration check had not failed.
 type TokenExpiredError struct {
 	// Expiry is the time when the token expired.
 	Expiry time.Time
@@ -31,7 +31,7 @@ func (e *TokenExpiredError) Error() string {
 	return fmt.Sprintf("oidc: token is expired (Token Expiry: %v)", e.Expiry)
 }
 
-// KeySet is a set of publc JSON Web Keys that can be used to validate the signature
+// KeySet is a set of public JSON Web Keys that can be used to validate the signature
 // of JSON web tokens. This is expected to be backed by a remote key set through
 // provider metadata discovery or an in-memory set of keys delivered out-of-band.
 type KeySet interface {
@@ -56,8 +56,8 @@ type IDTokenVerifier struct {
 // NewVerifier returns a verifier manually constructed from a key set and issuer URL.
 //
 // It's easier to use provider discovery to construct an IDTokenVerifier than creating
-// one directly. This method is intended to be used with provider that don't support
-// metadata discovery, or avoiding round trips when the key set URL is already known.
+// one directly. This method is intended to be used with providers that don't support
+// metadata discovery, or to avoid round trips when the key set URL is already known.
 //
 // This constructor can be used to create a verifier directly using the issuer URL and
 // JSON Web Key Set URL without using discovery:
@@ -83,8 +83,8 @@ type Config struct {
 	ClientID string
 	// If specified, only this set of algorithms may be used to sign the JWT.
 	//
-	// If the IDTokenVerifier is created from a provider with (*Provider).Verifier, this
-	// defaults to the set of algorithms the provider supports. Otherwise this values
+	// If the IDTokenVerifier is created from a provider with [Provider.Verifier], this
+	// defaults to the set of algorithms the provider supports. Otherwise this value
 	// defaults to RS256.
 	SupportedSigningAlgs []string
 
@@ -93,7 +93,7 @@ type Config struct {
 	// If true, token expiry is not checked.
 	SkipExpiryCheck bool
 
-	// SkipIssuerCheck is intended for specialized cases where the the caller wishes to
+	// SkipIssuerCheck is intended for specialized cases where the caller wishes to
 	// defer issuer validation. When enabled, callers MUST independently verify the Token's
 	// Issuer is a known good value.
 	//
@@ -118,8 +118,9 @@ type Config struct {
 }
 
 // VerifierContext returns an IDTokenVerifier that uses the provider's key set to
-// verify JWTs. As opposed to Verifier, the context is used to configure requests
-// to the upstream JWKs endpoint. The provided context's cancellation is ignored.
+// verify JWTs. As opposed to [Provider.Verifier], the context is used to configure
+// requests to the upstream JWKs endpoint. The provided context's cancellation is
+// ignored.
 func (p *Provider) VerifierContext(ctx context.Context, config *Config) *IDTokenVerifier {
 	return p.newVerifier(NewRemoteKeySet(ctx, p.jwksURL), config)
 }
@@ -127,7 +128,7 @@ func (p *Provider) VerifierContext(ctx context.Context, config *Config) *IDToken
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.
 //
 // The returned verifier uses a background context for all requests to the upstream
-// JWKs endpoint. To control that context, use VerifierContext instead.
+// JWKs endpoint. To control that context, use [Provider.VerifierContext] instead.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
 	return p.newVerifier(p.remoteKeySet(), config)
 }
@@ -179,7 +180,7 @@ func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src
 // Verify parses a raw ID Token, verifies it's been signed by the provider, performs
 // any additional checks depending on the Config, and returns the payload.
 //
-// Verify does NOT do nonce validation, which is the callers responsibility.
+// Verify does NOT do nonce validation, which is the caller's responsibility.
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 //
