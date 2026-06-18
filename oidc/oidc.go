@@ -301,7 +301,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 //
 // For a list of fields defined by the OpenID Connect spec see:
 // https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
-func (p *Provider) Claims(v interface{}) error {
+func (p *Provider) Claims(v any) error {
 	if p.rawClaims == nil {
 		return errors.New("oidc: claims not set")
 	}
@@ -340,7 +340,7 @@ type userInfoRaw struct {
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
-func (u *UserInfo) Claims(v interface{}) error {
+func (u *UserInfo) Claims(v any) error {
 	if u.claims == nil {
 		return errors.New("oidc: claims not set")
 	}
@@ -465,7 +465,7 @@ type IDToken struct {
 //	if err := idToken.Claims(&claims); err != nil {
 //		// handle error
 //	}
-func (i *IDToken) Claims(v interface{}) error {
+func (i *IDToken) Claims(v any) error {
 	if i.claims == nil {
 		return errors.New("oidc: claims not set")
 	}
@@ -570,7 +570,7 @@ func (j *jsonTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
+func unmarshalResp(r *http.Response, body []byte, v any) error {
 	err := json.Unmarshal(body, &v)
 	if err == nil {
 		return nil

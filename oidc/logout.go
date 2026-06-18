@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -163,7 +164,7 @@ func (v *IDTokenVerifier) VerifyLogout(ctx context.Context, rawLogoutToken strin
 
 	if !v.config.SkipClientIDCheck {
 		if v.config.ClientID != "" {
-			if !contains(t.Audience, v.config.ClientID) {
+			if !slices.Contains(t.Audience, v.config.ClientID) {
 				return nil, fmt.Errorf("oidc: expected logout token audience %q got %q", v.config.ClientID, t.Audience)
 			}
 		} else {

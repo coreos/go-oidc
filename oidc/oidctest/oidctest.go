@@ -91,7 +91,7 @@ func newToken(priv crypto.PrivateKey, keyID, alg, claims string) (string, error)
 		Key:       priv,
 	}
 	opts := &jose.SignerOptions{
-		ExtraHeaders: map[jose.HeaderKey]interface{}{
+		ExtraHeaders: map[jose.HeaderKey]any{
 			jose.HeaderKey("kid"): keyID,
 		},
 	}

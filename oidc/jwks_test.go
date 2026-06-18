@@ -37,8 +37,8 @@ func (k *keyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type signingKey struct {
 	keyID string // optional
-	priv  interface{}
-	pub   interface{}
+	priv  any
+	pub   any
 	alg   jose.SignatureAlgorithm
 }
 
@@ -173,8 +173,7 @@ func TestKeyVerifyContextCanceled(t *testing.T) {
 }
 
 func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signingKey) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	keySet := jose.JSONWebKeySet{}
 	for _, v := range verification {
@@ -222,8 +221,7 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 }
 
 func TestRotation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	key1 := newRSAKey(t)
 	key2 := newRSAKey(t)
@@ -287,8 +285,7 @@ func TestRotation(t *testing.T) {
 }
 
 func TestUpdateKeysSendsCacheControlNoCache(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	key := newRSAKey(t)
 	var requestHeaders []http.Header
@@ -325,21 +322,19 @@ func TestUpdateKeysSendsCacheControlNoCache(t *testing.T) {
 	}
 }
 
-
 func BenchmarkVerify(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 
 	key := newRSAKey(b)
 
 	now := time.Date(2022, 1, 29, 0, 0, 0, 0, time.UTC)
 	exp := now.Add(time.Hour)
-	payload := []byte(fmt.Sprintf(`{
+	payload := fmt.Appendf(nil, `{
 		"iss": "https://example.com",
 		"sub": "test_user",
 		"aud": "test_client_id",
 		"exp": %d
-	}`, exp.Unix()))
+	}`, exp.Unix())
 
 	idToken := key.sign(b, payload)
 	server := &keyServer{
@@ -361,8 +356,7 @@ func BenchmarkVerify(b *testing.B) {
 		b.Fatalf("verifying id token: %v", err)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := verifier.Verify(ctx, idToken); err != nil {
 			b.Fatalf("verifying id token: %v", err)
 		}

@@ -1,7 +1,6 @@
 package oidc
 
 import (
-	"context"
 	"crypto"
 	"encoding/base64"
 	"errors"
@@ -523,8 +522,7 @@ type resolverTest struct {
 func (v resolverTest) testEndpoint(t *testing.T) ([]byte, error) {
 	token := v.signKey.sign(t, []byte(v.payload))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := r.Header.Get("Authorization")
@@ -590,8 +588,7 @@ func (v verificationTest) runGetToken(t *testing.T) (*IDToken, error) {
 		token += "."
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	issuer := "https://foo"
 	if v.issuer != "" {
