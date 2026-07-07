@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -235,6 +236,55 @@ func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 	}
 }
 
+// jwkJSON implements custom logic for unmarshaling JSON Web Key Sets.
+type jwkJSON struct {
+	Keys []jose.JSONWebKey
+}
+
+func (j *jwkJSON) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Keys []json.RawMessage `json:"keys"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	// For each key, attempt to determine if the algorithm is supported before
+	// unmarshaling the key. This allows us to ignore keys with unsupported
+	// algorithms, rather than failing to load the entire set.
+	for _, key := range raw.Keys {
+		var metadata struct {
+			Alg string `json:"alg"`
+		}
+		if err := json.Unmarshal(key, &metadata); err != nil {
+			return err
+		}
+		if metadata.Alg != "" {
+			// Algorithms are technically optional, but if the key advertises an
+			// algorithm we don't support, ignore it rather than failing to load
+			// the entire key set.
+			//
+			// https://datatracker.ietf.org/doc/html/rfc7517#section-4.4
+			//
+			// This skip is currently implemented due to secp256k1, which some
+			// providers use for signing with "ES256K". While we could also
+			// ignore the curve, this seems like a more general check in case
+			// providers start throwing in post-quantum algorithims or something
+			// like that.
+			//
+			// https://github.com/coreos/go-oidc/issues/490
+			if !supportedJOSEAlgs[metadata.Alg] {
+				continue
+			}
+		}
+		var jwk jose.JSONWebKey
+		if err := json.Unmarshal(key, &jwk); err != nil {
+			return err
+		}
+		j.Keys = append(j.Keys, jwk)
+	}
+	return nil
+}
+
 func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 	req, err := http.NewRequest("GET", r.jwksURL, nil)
 	if err != nil {
@@ -257,7 +307,7 @@ func (r *RemoteKeySet) updateKeys() ([]jose.JSONWebKey, error) {
 		return nil, fmt.Errorf("oidc: get keys failed: %s %s", resp.Status, body)
 	}
 
-	var keySet jose.JSONWebKeySet
+	var keySet jwkJSON
 	err = unmarshalResp(resp, body, &keySet)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode keys: %v %s", err, body)

@@ -362,3 +362,67 @@ func BenchmarkVerify(b *testing.B) {
 		}
 	}
 }
+
+func TestJWKParseWithIgnoredKeys(t *testing.T) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubKey := jose.JSONWebKey{
+		Key:       priv.Public(),
+		Use:       "sig",
+		Algorithm: string(jose.ES256),
+		KeyID:     "key1",
+	}
+	pubRaw, err := json.Marshal(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privKey := jose.JSONWebKey{
+		Key:       priv,
+		Use:       "sig",
+		Algorithm: string(jose.ES256),
+		KeyID:     "key1",
+	}
+
+	hf := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{
+			"keys": [
+				`+string(pubRaw)+`,
+				{
+					"alg": "ES256K",
+					"kty": "EC",
+					"x": "vsk5i5YJu8H_VPL7DWTgVGXBPrqgkyNmYvfgOrVut38",
+					"y": "Mrg56tBhVeorHPXK1LbTX2jP7rEqOHIatM96HFzVMIU",
+					"crv": "secp256k1",
+					"kid": "oidc-es256k-1",
+					"use": "sig"
+				}
+			]
+		}`)
+	}
+
+	ks := NewRemoteKeySet(t.Context(), httptest.NewServer(http.HandlerFunc(hf)).URL)
+
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: &privKey}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jws, err := signer.Sign([]byte("payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialized, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ks.VerifySignature(t.Context(), serialized)
+	if err != nil {
+		t.Fatalf("failed to verify signature: %v", err)
+	}
+	if string(got) != "payload" {
+		t.Errorf("expected payload %q got %q", "payload", string(got))
+	}
+}
