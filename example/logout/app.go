@@ -104,7 +104,7 @@ func main() {
 		ClientSecret: clientSecret,
 		Endpoint:     provider.Endpoint(),
 		RedirectURL:  callbackURL,
-		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail},
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -23,6 +23,26 @@ const (
 	// ScopeOpenID is the mandatory scope for all OpenID Connect OAuth2 requests.
 	ScopeOpenID = "openid"
 
+	// ScopeProfile can be used to request information about the user's profile,
+	// such as "name", "picture", etc.
+	//
+	// The exact set of claims supported by identity providers differs widely,
+	// though "name" and "picture" are commonly returned.
+	//
+	// See: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+	ScopeProfile = "profile"
+
+	// ScopeEmail can be used to request the user's email address through the
+	// "email" and "email_verified" claims.
+	//
+	// What it means to verify an email isn't well defined. Clients can
+	// generally throw out emails when the "emvail_verified" claim is false, but
+	// should consult identity provider specific docs if attempting to ensure
+	// that the user controls the returned email address.
+	//
+	// See: https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+	ScopeEmail = "email"
+
 	// ScopeOfflineAccess is an optional scope defined by OpenID Connect for requesting
 	// OAuth2 refresh tokens.
 	//
