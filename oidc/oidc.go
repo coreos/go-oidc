@@ -340,6 +340,11 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 			algs = append(algs, a)
 		}
 	}
+	
+	if p.JWKSURL == "" {
+		return nil, fmt.Errorf("oidc: remote keys urls is empty")
+	}
+
 	return &Provider{
 		issuer:        issuerURL,
 		authURL:       p.AuthURL,
