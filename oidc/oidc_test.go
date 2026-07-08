@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -340,6 +341,49 @@ func TestNewProvider(t *testing.T) {
 					p.algorithms, test.wantAlgorithms)
 			}
 		})
+	}
+}
+
+func TestIssuerMismatchError(t *testing.T) {
+	ctx := t.Context()
+
+	var issuer string
+	hf := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/.well-known/openid-configuration" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		// The discovery document advertises an issuer that differs from the
+		// one requested (note the trailing slash), which must be rejected.
+		io.WriteString(w, `{
+			"issuer": "`+issuer+`/",
+			"authorization_endpoint": "https://example.com/auth",
+			"token_endpoint": "https://example.com/token",
+			"jwks_uri": "https://example.com/keys",
+			"id_token_signing_alg_values_supported": ["RS256"]
+		}`)
+	}
+	s := httptest.NewServer(http.HandlerFunc(hf))
+	defer s.Close()
+	issuer = s.URL
+
+	_, err := NewProvider(ctx, issuer)
+	if err == nil {
+		t.Fatal("NewProvider(): expected error, got nil")
+	}
+
+	var mismatchErr *IssuerMismatchError
+	if !errors.As(err, &mismatchErr) {
+		t.Fatalf("NewProvider() returned %T, want *IssuerMismatchError: %v", err, err)
+	}
+
+	want := &IssuerMismatchError{
+		Provided:   issuer,
+		Discovered: issuer + "/",
+	}
+	if !reflect.DeepEqual(mismatchErr, want) {
+		t.Errorf("NewProvider() returned unexpected error, got=%+v, want=%+v", mismatchErr, want)
 	}
 }
 
