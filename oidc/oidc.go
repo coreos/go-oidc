@@ -244,9 +244,33 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 	}
 }
 
+// IssuerMismatchError is returned by [NewProvider] when the "iss" value
+// reported by the upstream is different than the expected value.
+//
+// Issuer mismatches can occur due to trailing slashes ("https://example.com"
+// vs. "https://example.com/") or represent significant misconfiguration for
+// multi-tenant issuers.
+//
+// Issuers must match exactly as they are also used to validate ID Tokens.
+//
+// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+type IssuerMismatchError struct {
+	// The value provided to this package. The expected value.
+	Provided string
+	// The value advertised by the discovery document.
+	Discovered string
+}
+
+func (e *IssuerMismatchError) Error() string {
+	return fmt.Sprintf("oidc: issuer URL provided to client (%q) did not match the issuer URL returned by provider (%q)", e.Provided, e.Discovered)
+}
+
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
+//
+// If the "iss" value returned in the discovery document doesn't match the value
+// provided here, [IssuerMismatchError] is returned.
 //
 // OpenID Connect providers that don't implement discovery or host the discovery
 // document at a non-spec compliant path (such as requiring a URL parameter),
@@ -285,7 +309,10 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		issuerURL = issuer
 	}
 	if p.Issuer != issuerURL && !skipIssuerValidation {
-		return nil, fmt.Errorf("oidc: issuer URL provided to client (%q) did not match the issuer URL returned by provider (%q)", issuer, p.Issuer)
+		return nil, &IssuerMismatchError{
+			Provided:   issuerURL,
+			Discovered: p.Issuer,
+		}
 	}
 	var algs []string
 	for _, a := range p.Algorithms {
