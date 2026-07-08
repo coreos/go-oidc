@@ -17,7 +17,7 @@
 //	    // Discovery returns the OAuth2 endpoints.
 //	    Endpoint: provider.Endpoint(),
 //	    // "openid" is a required scope for OpenID Connect flows.
-//	    Scopes: []string{oidc.ScopeOpenID, "profile", "email"},
+//	    Scopes: []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail},
 //	}
 //
 //	idTokenVerifier := provider.Verifier(&oidc.Config{ClientID: clientID})
