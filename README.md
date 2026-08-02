@@ -80,13 +80,26 @@ oauth2Config := oauth2.Config{
 idTokenVerifier := provider.Verifier(&oidc.Config{ClientID: clientID})
 ```
 
-OAuth2 redirects are unchanged.
+OAuth2 redirects are unchanged, except for PKCE ([RFC 7636][pkce]). The [OAuth 2.0
+Security Best Current Practice][oauth2-bcp] requires PKCE for public clients and
+recommends it for confidential ones, and some providers reject an authorization
+code exchange that omits it. `golang.org/x/oauth2` implements it: generate a
+verifier per authorization request, send its challenge on the redirect, and hold
+the verifier until the callback.
 
 ```go
 func handleRedirect(w http.ResponseWriter, r *http.Request) {
-    http.Redirect(w, r, oauth2Config.AuthCodeURL(state), http.StatusFound)
+    // A fresh verifier is required for each authorization request. Store it the
+    // same way the state is stored, so the callback can replay it.
+    codeVerifier := oauth2.GenerateVerifier()
+
+    http.Redirect(w, r, oauth2Config.AuthCodeURL(state,
+        oauth2.S256ChallengeOption(codeVerifier)), http.StatusFound)
 }
 ```
+
+[pkce]: https://datatracker.ietf.org/doc/html/rfc7636
+[oauth2-bcp]: https://datatracker.ietf.org/doc/html/rfc9700#section-2.1.1
 
 Then, on the response, the ID Token verifier can be used to verify ID Tokens.
 
@@ -94,7 +107,9 @@ Then, on the response, the ID Token verifier can be used to verify ID Tokens.
 func handleOAuth2Callback(w http.ResponseWriter, r *http.Request) {
     // Verify state and errors.
 
-    oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
+    // Replay the verifier held since the redirect.
+    oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"),
+        oauth2.VerifierOption(codeVerifier))
     if err != nil {
         // handle error
     }
@@ -123,3 +138,12 @@ func handleOAuth2Callback(w http.ResponseWriter, r *http.Request) {
     }
 }
 ```
+
+## Examples
+
+The [example](example) directory holds runnable programs for the flows above,
+each performing the full authorization code exchange with PKCE:
+
+- [example/idtoken](example/idtoken) parses and verifies an ID Token.
+- [example/userinfo](example/userinfo) queries the UserInfo endpoint.
+- [example/logout](example/logout) verifies back-channel logout tokens.

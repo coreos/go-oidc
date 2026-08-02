@@ -22,10 +22,18 @@
 //
 //	idTokenVerifier := provider.Verifier(&oidc.Config{ClientID: clientID})
 //
-// OAuth 2.0 redirects then opt into the OpenID Connect flow with [ScopeOpenID]:
+// OAuth 2.0 redirects then opt into the OpenID Connect flow with [ScopeOpenID].
+// Redirects also carry a PKCE challenge (RFC 7636), which RFC 9700 requires for
+// public clients and recommends for confidential ones. Generate a fresh verifier
+// per authorization request and store it the way the state is stored, so the
+// callback can replay it:
 //
 //	func handleRedirect(w http.ResponseWriter, r *http.Request) {
-//		http.Redirect(w, r, oauth2Config.AuthCodeURL(state), http.StatusFound)
+//		codeVerifier := oauth2.GenerateVerifier()
+//		// Store codeVerifier for the callback, e.g. in a secure cookie.
+//
+//		http.Redirect(w, r, oauth2Config.AuthCodeURL(state,
+//			oauth2.S256ChallengeOption(codeVerifier)), http.StatusFound)
 //	}
 //
 // When handling an OAuth 2.0 response, an [IDTokenVerifier] can be used to
@@ -35,8 +43,10 @@
 //	func handleOAuth2Callback(w http.ResponseWriter, r *http.Request) {
 //		// Verify state and other OAuth 2.0 responses.
 //
-//		// Perform standard token exchange.
-//		oauth2Token, err := oauth2Config.Exchange(r.Context(), r.URL.Query().Get("code"))
+//		// Perform standard token exchange, replaying the PKCE verifier held
+//		// since the redirect.
+//		oauth2Token, err := oauth2Config.Exchange(r.Context(), r.URL.Query().Get("code"),
+//			oauth2.VerifierOption(codeVerifier))
 //		if err != nil {
 //			// ...
 //		}
