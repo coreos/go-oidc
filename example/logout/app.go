@@ -118,10 +118,12 @@ func main() {
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
+		codeVerifier := oauth2.GenerateVerifier()
 		setCallbackCookie(w, r, "state", state)
 		setCallbackCookie(w, r, "nonce", nonce)
+		setCallbackCookie(w, r, "code_verifier", codeVerifier)
 
-		http.Redirect(w, r, config.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
+		http.Redirect(w, r, config.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(codeVerifier)), http.StatusFound)
 	})
 
 	http.HandleFunc("POST /logout", func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +155,13 @@ func main() {
 			return
 		}
 
-		oauth2Token, err := config.Exchange(ctx, r.URL.Query().Get("code"))
+		codeVerifier, err := r.Cookie("code_verifier")
+		if err != nil {
+			http.Error(w, "code_verifier not found", http.StatusBadRequest)
+			return
+		}
+
+		oauth2Token, err := config.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(codeVerifier.Value))
 		if err != nil {
 			http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 			return
