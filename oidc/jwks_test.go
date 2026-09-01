@@ -426,3 +426,72 @@ func TestJWKParseWithIgnoredKeys(t *testing.T) {
 		t.Errorf("expected payload %q got %q", "payload", string(got))
 	}
 }
+
+func TestJWKParseWithUnsupportedKeys(t *testing.T) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubKey := jose.JSONWebKey{
+		Key:       priv.Public(),
+		Use:       "sig",
+		Algorithm: string(jose.ES256),
+		KeyID:     "key1",
+	}
+	pubRaw, err := json.Marshal(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privKey := jose.JSONWebKey{
+		Key:       priv,
+		Use:       "sig",
+		Algorithm: string(jose.ES256),
+		KeyID:     "key1",
+	}
+
+	hf := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{
+			"keys": [
+				`+string(pubRaw)+`,
+				{
+					"kty": "OKP",
+					"crv": "Ed448",
+					"kid": "oidc-ed448-1",
+					"use": "sig",
+					"x": "gH1eRK-6hW6ZoAy2k11U4L5uaIaMaZTMCf1cAbsxsYLvTqV2-TQG1PNyLOrhZkMyzUJulMc1wAfH"
+				},
+				{
+					"kty": "OKP",
+					"crv": "X448",
+					"kid": "oidc-x448-1",
+					"use": "enc",
+					"x": "5Tegc13rI3bLqrCiUo-Cg1Ijjaj0l1aZrkVfUFbp-B5CGSj5z3wdAr3B0K7pPYDm9qbtjmMKOf0"
+				}
+			]
+		}`)
+	}
+
+	ks := NewRemoteKeySet(t.Context(), httptest.NewServer(http.HandlerFunc(hf)).URL)
+
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: &privKey}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jws, err := signer.Sign([]byte("payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialized, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ks.VerifySignature(t.Context(), serialized)
+	if err != nil {
+		t.Fatalf("failed to verify signature: %v", err)
+	}
+	if string(got) != "payload" {
+		t.Errorf("expected payload %q got %q", "payload", string(got))
+	}
+}
