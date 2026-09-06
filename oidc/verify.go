@@ -220,6 +220,10 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		distributedClaims[cn] = s
 	}
 
+	if token.Subject == "" {
+		return nil, fmt.Errorf("oidc: id token missing required 'sub' claim")
+	}
+
 	t := &IDToken{
 		Issuer:            token.Issuer,
 		Subject:           token.Subject,

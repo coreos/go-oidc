@@ -16,8 +16,28 @@ import (
 func TestVerify(t *testing.T) {
 	tests := []verificationTest{
 		{
-			name:    "good token",
+			name:    "missing sub",
 			idToken: `{"iss":"https://foo"}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "null sub",
+			idToken: `{"iss":"https://foo","sub":null}`,
+			config: Config{
+				SkipClientIDCheck: true,
+				SkipExpiryCheck:   true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "good token",
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -26,7 +46,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name:    "good eddsa token",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck:    true,
 				SkipExpiryCheck:      true,
@@ -37,7 +57,7 @@ func TestVerify(t *testing.T) {
 		{
 			name:    "invalid issuer",
 			issuer:  "https://bar",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -48,7 +68,7 @@ func TestVerify(t *testing.T) {
 		{
 			name:    "skip issuer check",
 			issuer:  "https://bar",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipIssuerCheck:   true,
 				SkipClientIDCheck: true,
@@ -58,7 +78,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name:    "invalid sig",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -70,7 +90,7 @@ func TestVerify(t *testing.T) {
 		{
 			name:    "google accounts without scheme",
 			issuer:  "https://accounts.google.com",
-			idToken: `{"iss":"accounts.google.com"}`,
+			idToken: `{"iss":"accounts.google.com","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -79,7 +99,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name:    "expired token",
-			idToken: `{"iss":"https://foo","exp":` + strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + `}`,
+			idToken: `{"iss":"https://foo","sub":"user","exp":` + strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
 			},
@@ -88,7 +108,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name:    "unexpired token",
-			idToken: `{"iss":"https://foo","exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
+			idToken: `{"iss":"https://foo","sub":"user","exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
 			},
@@ -96,7 +116,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name: "expiry as float",
-			idToken: `{"iss":"https://foo","exp":` +
+			idToken: `{"iss":"https://foo","sub":"user","exp":` +
 				strconv.FormatFloat(float64(time.Now().Add(time.Hour).Unix()), 'E', -1, 64) +
 				`}`,
 			config: Config{
@@ -106,7 +126,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name: "nbf in future",
-			idToken: `{"iss":"https://foo","nbf":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) +
+			idToken: `{"iss":"https://foo","sub":"user","nbf":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) +
 				`,"exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
@@ -116,7 +136,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name: "nbf in past",
-			idToken: `{"iss":"https://foo","nbf":` + strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) +
+			idToken: `{"iss":"https://foo","sub":"user","nbf":` + strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) +
 				`,"exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
@@ -125,7 +145,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name: "nbf in future within clock skew tolerance",
-			idToken: `{"iss":"https://foo","nbf":` + strconv.FormatInt(time.Now().Add(30*time.Second).Unix(), 10) +
+			idToken: `{"iss":"https://foo","sub":"user","nbf":` + strconv.FormatInt(time.Now().Add(30*time.Second).Unix(), 10) +
 				`,"exp":` + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10) + `}`,
 			config: Config{
 				SkipClientIDCheck: true,
@@ -134,7 +154,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name:    "unsigned token",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -143,7 +163,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name:    "unsigned token InsecureSkipSignatureCheck",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck:          true,
 				SkipExpiryCheck:            true,
@@ -160,7 +180,7 @@ func TestVerifyAudience(t *testing.T) {
 	tests := []verificationTest{
 		{
 			name:    "good audience",
-			idToken: `{"iss":"https://foo","aud":"client1"}`,
+			idToken: `{"iss":"https://foo","sub":"user","aud":"client1"}`,
 			config: Config{
 				ClientID:        "client1",
 				SkipExpiryCheck: true,
@@ -169,7 +189,7 @@ func TestVerifyAudience(t *testing.T) {
 		},
 		{
 			name:    "mismatched audience",
-			idToken: `{"iss":"https://foo","aud":"client2"}`,
+			idToken: `{"iss":"https://foo","sub":"user","aud":"client2"}`,
 			config: Config{
 				ClientID:        "client1",
 				SkipExpiryCheck: true,
@@ -179,7 +199,7 @@ func TestVerifyAudience(t *testing.T) {
 		},
 		{
 			name:    "multiple audiences, one matches",
-			idToken: `{"iss":"https://foo","aud":["client1","client2"]}`,
+			idToken: `{"iss":"https://foo","sub":"user","aud":["client1","client2"]}`,
 			config: Config{
 				ClientID:        "client2",
 				SkipExpiryCheck: true,
@@ -196,7 +216,7 @@ func TestVerifySigningAlg(t *testing.T) {
 	tests := []verificationTest{
 		{
 			name:    "default signing alg",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -205,7 +225,7 @@ func TestVerifySigningAlg(t *testing.T) {
 		},
 		{
 			name:    "bad signing alg",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck: true,
 				SkipExpiryCheck:   true,
@@ -215,7 +235,7 @@ func TestVerifySigningAlg(t *testing.T) {
 		},
 		{
 			name:    "ecdsa signing",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SupportedSigningAlgs: []string{ES256},
 				SkipClientIDCheck:    true,
@@ -225,7 +245,7 @@ func TestVerifySigningAlg(t *testing.T) {
 		},
 		{
 			name:    "eddsa signing",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck:    true,
 				SkipExpiryCheck:      true,
@@ -235,7 +255,7 @@ func TestVerifySigningAlg(t *testing.T) {
 		},
 		{
 			name:    "one of many supported",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SkipClientIDCheck:    true,
 				SkipExpiryCheck:      true,
@@ -245,7 +265,7 @@ func TestVerifySigningAlg(t *testing.T) {
 		},
 		{
 			name:    "not in requiredAlgs",
-			idToken: `{"iss":"https://foo"}`,
+			idToken: `{"iss":"https://foo","sub":"user"}`,
 			config: Config{
 				SupportedSigningAlgs: []string{RS256, ES512},
 				SkipClientIDCheck:    true,
@@ -264,7 +284,7 @@ func TestAccessTokenHash(t *testing.T) {
 	atHash := "piwt8oCH-K2D9pXlaS1Y-w"
 	vt := verificationTest{
 		name:    "preserves token hash and sig algo",
-		idToken: `{"iss":"https://foo","aud":"client1", "at_hash": "` + atHash + `"}`,
+		idToken: `{"iss":"https://foo","sub":"user","aud":"client1", "at_hash": "` + atHash + `"}`,
 		config: Config{
 			ClientID:        "client1",
 			SkipExpiryCheck: true,
@@ -295,7 +315,7 @@ func TestDistributedClaims(t *testing.T) {
 		{
 			test: verificationTest{
 				name:    "NoDistClaims",
-				idToken: `{"iss":"https://foo","aud":"client1"}`,
+				idToken: `{"iss":"https://foo","sub":"user","aud":"client1"}`,
 				config: Config{
 					ClientID:        "client1",
 					SkipExpiryCheck: true,
@@ -308,7 +328,7 @@ func TestDistributedClaims(t *testing.T) {
 			test: verificationTest{
 				name: "1DistClaim",
 				idToken: `{
-							"iss":"https://foo","aud":"client1",
+							"iss":"https://foo","sub":"user","aud":"client1",
 							"_claim_names": {
 							    "address": "src1"
 						 	},
@@ -330,7 +350,7 @@ func TestDistributedClaims(t *testing.T) {
 			test: verificationTest{
 				name: "2DistClaims1Src",
 				idToken: `{
-							"iss":"https://foo","aud":"client1",
+							"iss":"https://foo","sub":"user","aud":"client1",
 							"_claim_names": {
 							    "address": "src1",
 							    "phone_number": "src1"
@@ -354,7 +374,7 @@ func TestDistributedClaims(t *testing.T) {
 			test: verificationTest{
 				name: "1Name0Src",
 				idToken: `{
-							"iss":"https://foo","aud":"client1",
+							"iss":"https://foo","sub":"user","aud":"client1",
 							"_claim_names": {
 								"address": "src1"
 						 	},
@@ -373,7 +393,7 @@ func TestDistributedClaims(t *testing.T) {
 			test: verificationTest{
 				name: "NoNames1Src",
 				idToken: `{
-							"iss":"https://foo","aud":"client1",
+							"iss":"https://foo","sub":"user","aud":"client1",
 							"_claim_names": {
 						 	},
 						 	"_claim_sources": {
@@ -413,7 +433,7 @@ func TestDistClaimResolver(t *testing.T) {
 	tests := []resolverTest{
 		{
 			name: "noAccessToken",
-			payload: `{"iss":"https://foo","aud":"client1",
+			payload: `{"iss":"https://foo","sub":"user","aud":"client1",
 				"email":"janedoe@email.com",
 				"shipping_address": {
 					"street_address": "1234 Hollywood Blvd.",
@@ -433,7 +453,7 @@ func TestDistClaimResolver(t *testing.T) {
 		},
 		{
 			name: "rightAccessToken",
-			payload: `{"iss":"https://foo","aud":"client1",
+			payload: `{"iss":"https://foo","sub":"user","aud":"client1",
 				"email":"janedoe@email.com",
 				"shipping_address": {
 					"street_address": "1234 Hollywood Blvd.",
@@ -454,7 +474,7 @@ func TestDistClaimResolver(t *testing.T) {
 		},
 		{
 			name: "wrongAccessToken",
-			payload: `{"iss":"https://foo","aud":"client1",
+			payload: `{"iss":"https://foo","sub":"user","aud":"client1",
 				"email":"janedoe@email.com",
 				"shipping_address": {
 					"street_address": "1234 Hollywood Blvd.",
