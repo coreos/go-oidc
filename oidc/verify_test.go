@@ -1,12 +1,14 @@
 package oidc
 
 import (
+	"context"
 	"crypto"
 	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strconv"
 	"testing"
@@ -618,5 +620,53 @@ func (v verificationTest) run(t *testing.T) {
 		if !errors.As(err, &errExp) {
 			t.Errorf("expected *TokenExpiryError but got %q", err)
 		}
+	}
+}
+
+func TestVerifyKeySetErrorIsWrapped(t *testing.T) {
+	key := newRSAKey(t)
+
+	// A JWKS endpoint that can't be reached, so fetching keys fails with a
+	// transport error rather than the token being invalid.
+	s := httptest.NewServer(http.NotFoundHandler())
+	jwksURL := s.URL + "/keys"
+	s.Close()
+
+	ctx := context.Background()
+	verifier := NewVerifier("https://foo", NewRemoteKeySet(ctx, jwksURL), &Config{
+		SkipClientIDCheck: true,
+		SkipExpiryCheck:   true,
+	})
+
+	_, err := verifier.Verify(ctx, key.sign(t, []byte(`{"iss":"https://foo"}`)))
+	if err == nil {
+		t.Fatal("expected error fetching keys, got nil")
+	}
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		t.Errorf("expected error to wrap a *url.Error, got %T: %v", err, err)
+	}
+}
+
+func TestVerifyContextCanceledIsWrapped(t *testing.T) {
+	key := newRSAKey(t)
+
+	ch := make(chan struct{})
+	defer close(ch)
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-ch
+	}))
+	defer s.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	verifier := NewVerifier("https://foo", NewRemoteKeySet(context.Background(), s.URL), &Config{
+		SkipClientIDCheck: true,
+		SkipExpiryCheck:   true,
+	})
+	cancel()
+
+	_, err := verifier.Verify(ctx, key.sign(t, []byte(`{"iss":"https://foo"}`)))
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected error to be %q, got %v", context.Canceled, err)
 	}
 }
