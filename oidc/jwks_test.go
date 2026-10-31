@@ -14,7 +14,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -281,6 +284,165 @@ func TestRotation(t *testing.T) {
 	}
 	if _, err := rks.verify(ctx, jws2); err != nil {
 		t.Errorf("failed to verify valid signature: %v", err)
+	}
+}
+
+// TestRemoteKeySetRefreshCompletion checks that the cache and fetch state are
+// updated before callers are notified.
+//
+//  1. Verify a key 0 token with an empty cache. The server pauses its response,
+//     which contains only key 0.
+//  2. Take the read lock, then release the response. The fetch can read the keys
+//     but cannot take the write lock to update the cache.
+//  3. Wait for TryRLock to fail. A waiting writer blocks new readers, proving
+//     that the fetch has reached the cache-update lock.
+//  4. Check that the completion channel is still open: callers must not be
+//     notified while the cache update is blocked.
+//  5. Release the lock and let the fetch finish. Key 0 is now cached. A key 1
+//     token must trigger a second request because key 1 is absent. The server
+//     returns only key 1, and verification must succeed immediately. Verifying
+//     that token again uses the cache, keeping the request count at two.
+//  6. Key 0 is now absent from both the cache and server. Two verifications
+//     using key 0 must each fetch and fail, bringing the request count to four.
+//
+// Repeat with the first fetch returning an HTTP error, and check that canceling
+// one caller leaves the shared fetch running.
+func TestRemoteKeySetRefreshCompletion(t *testing.T) {
+	for _, failRefresh := range []bool{false, true} {
+		t.Run(fmt.Sprintf("failRefresh=%t", failRefresh), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+
+			// Use two distinct key IDs to test rotation.
+			var keys []*signingKey
+			var tokens []string
+			for i := range 2 {
+				key := newECDSAKey(t)
+				key.keyID = fmt.Sprintf("key%d", i)
+				keys = append(keys, key)
+				tokens = append(tokens, key.sign(t, fmt.Appendf(nil,
+					`{"iss":"https://example.com","sub":"subject","aud":"client","exp":%d}`,
+					time.Now().Add(time.Hour).Unix())))
+			}
+
+			requested := make(chan struct{})
+			release := make(chan struct{})
+			var requests atomic.Int32
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				n := requests.Add(1)
+				if n == 1 {
+					// Pause until the test holds the cache's read lock.
+					close(requested)
+					select {
+					case <-release:
+					case <-ctx.Done():
+						return
+					}
+					if failRefresh {
+						http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+						return
+					}
+				}
+				// Return only key 0 on the first request, then only key 1.
+				i := min(int(n)-1, len(keys)-1)
+				if err := json.NewEncoder(w).Encode(jose.JSONWebKeySet{
+					Keys: []jose.JSONWebKey{keys[i].jwk()},
+				}); err != nil {
+					t.Errorf("serving keys: %v", err)
+				}
+			}))
+			defer func() {
+				cancel()
+				s.Close()
+			}()
+
+			client := s.Client()
+			client.Timeout = 10 * time.Second
+			rks := NewRemoteKeySet(ClientContext(ctx, client), s.URL)
+			verifier := NewVerifier("https://example.com", rks, &Config{
+				ClientID:             "client",
+				SupportedSigningAlgs: []string{ES256},
+			})
+
+			// The cache is empty, so the key 0 token starts the first request.
+			verified := make(chan error, 1)
+			go func() {
+				_, err := verifier.Verify(ctx, tokens[0])
+				verified <- err
+			}()
+			select {
+			case <-requested:
+			case <-ctx.Done():
+				t.Fatal("timed out waiting for refresh request")
+			}
+
+			// Canceling one waiter must not cancel the shared refresh.
+			canceled, cancelWaiter := context.WithCancel(ctx)
+			cancelWaiter()
+			if _, err := verifier.Verify(canceled, tokens[0]); err == nil || !strings.Contains(err.Error(), context.Canceled.Error()) {
+				t.Fatalf("canceled waiter error = %v, want context.Canceled", err)
+			}
+
+			func() {
+				// Finish the HTTP response while a read lock blocks the cache update.
+				rks.mu.RLock()
+				defer rks.mu.RUnlock()
+				inflight := rks.inflight
+				close(release)
+
+				// Wait until the fetch reaches the cache update. A waiting writer
+				// blocks new readers, so TryRLock fails while we hold our read lock.
+				for rks.mu.TryRLock() {
+					rks.mu.RUnlock()
+					select {
+					case <-ctx.Done():
+						t.Fatal("timed out waiting for refresh publication")
+					default:
+						runtime.Gosched()
+					}
+				}
+				// Callers must not be notified until the cache update can finish.
+				select {
+				case <-inflight.wait():
+					t.Error("refresh completed before publishing cache and clearing inflight")
+				default:
+				}
+			}()
+
+			// With the lock released, the first caller gets success or a fetch error.
+			select {
+			case err := <-verified:
+				if (err != nil) != failRefresh {
+					t.Fatalf("refresh verification error = %v, failRefresh = %t", err, failRefresh)
+				}
+			case <-ctx.Done():
+				t.Fatal("timed out waiting for refresh verification")
+			}
+
+			// Key 1 was not in the first response. Its token must trigger a second
+			// request and succeed immediately, including after a failed first fetch.
+			if _, err := verifier.Verify(ctx, tokens[1]); err != nil {
+				t.Fatalf("verifying after rotation: %v", err)
+			}
+			// Key 1 is now cached. Verifying it again must keep the count at two.
+			if _, err := verifier.Verify(ctx, tokens[1]); err != nil {
+				t.Fatalf("verifying rotated key from cache: %v", err)
+			}
+			if got := requests.Load(); got != 2 {
+				t.Fatalf("JWKS requests = %d, want 2", got)
+			}
+
+			// Key 0 is absent from both the cache and server now. Each verification
+			// must fetch and fail, bringing the request count to four.
+			for range 2 {
+				if _, err := verifier.Verify(ctx, tokens[0]); err == nil {
+					t.Fatal("verified a key absent from the refreshed JWKS")
+				}
+			}
+			if got := requests.Load(); got != 4 {
+				t.Fatalf("JWKS requests after unknown kid = %d, want 4", got)
+			}
+		})
 	}
 }
 
