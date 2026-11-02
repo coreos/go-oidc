@@ -114,11 +114,12 @@ func newToken(priv crypto.PrivateKey, keyID, alg, claims string) (string, error)
 // PublicKey holds a public key as well as additional metadata about that
 // key.
 type PublicKey struct {
-	// Either *rsa.PublicKey or *ecdsa.PublicKey.
+	// Supported types are *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey,
+	// and *mldsa.PublicKey (Go 1.27+).
 	PublicKey crypto.PublicKey
 	// The ID of the key. Should match the value passed to [SignIDToken].
 	KeyID string
-	// Signature algorithm used by the public key, such as "RS256" or "RS256".
+	// Signature algorithm used by the public key, such as "RS256" or "ES256".
 	Algorithm string
 }
 

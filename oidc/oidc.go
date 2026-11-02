@@ -579,6 +579,10 @@ func (i *IDToken) Claims(v any) error {
 // matches the hash in the ID token. It returns an error if the hashes don't match.
 // It is the caller's responsibility to ensure that the optional access token hash is present for the ID token
 // before calling this method. See https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+//
+// VerifyAccessToken is not supported for ML-DSA signed tokens (ML-DSA-44, ML-DSA-65, ML-DSA-87)
+// because ML-DSA uses SHAKE256, and neither OpenID Connect Core 1.0 nor RFC 9964 defines an
+// at_hash computation for ML-DSA.
 func (i *IDToken) VerifyAccessToken(accessToken string) error {
 	if i.AccessTokenHash == "" {
 		return errNoAtHash

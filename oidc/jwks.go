@@ -19,7 +19,7 @@ import (
 // StaticKeySet is a verifier that validates JWT against a static set of public keys.
 type StaticKeySet struct {
 	// PublicKeys used to verify the JWT. Supported types are *rsa.PublicKey,
-	// *ecdsa.PublicKey, and ed25519.PublicKey.
+	// *ecdsa.PublicKey, ed25519.PublicKey, and *mldsa.PublicKey (Go 1.27+).
 	PublicKeys []crypto.PublicKey
 }
 
@@ -37,7 +37,9 @@ func (s *StaticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 		case *ecdsa.PublicKey:
 		case ed25519.PublicKey:
 		default:
-			return nil, fmt.Errorf("invalid public key type provided: %T", pub)
+			if !isMLDSAPublicKey(pub) {
+				return nil, fmt.Errorf("invalid public key type provided: %T", pub)
+			}
 		}
 		payload, err := jws.Verify(pub)
 		if err != nil {

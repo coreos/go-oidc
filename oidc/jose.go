@@ -2,20 +2,23 @@ package oidc
 
 import jose "github.com/go-jose/go-jose/v4"
 
-// JOSE asymmetric signing algorithm values as defined by RFC 7518
+// JOSE asymmetric signing algorithm values as defined by RFC 7518 and RFC 9964.
 //
-// see: https://tools.ietf.org/html/rfc7518#section-3.1
+// see: https://tools.ietf.org/html/rfc7518#section-3.1 and https://www.rfc-editor.org/rfc/rfc9964.html
 const (
-	RS256 = "RS256" // RSASSA-PKCS-v1.5 using SHA-256
-	RS384 = "RS384" // RSASSA-PKCS-v1.5 using SHA-384
-	RS512 = "RS512" // RSASSA-PKCS-v1.5 using SHA-512
-	ES256 = "ES256" // ECDSA using P-256 and SHA-256
-	ES384 = "ES384" // ECDSA using P-384 and SHA-384
-	ES512 = "ES512" // ECDSA using P-521 and SHA-512
-	PS256 = "PS256" // RSASSA-PSS using SHA256 and MGF1-SHA256
-	PS384 = "PS384" // RSASSA-PSS using SHA384 and MGF1-SHA384
-	PS512 = "PS512" // RSASSA-PSS using SHA512 and MGF1-SHA512
-	EdDSA = "EdDSA" // Ed25519 using SHA-512
+	RS256   = "RS256"     // RSASSA-PKCS-v1.5 using SHA-256
+	RS384   = "RS384"     // RSASSA-PKCS-v1.5 using SHA-384
+	RS512   = "RS512"     // RSASSA-PKCS-v1.5 using SHA-512
+	ES256   = "ES256"     // ECDSA using P-256 and SHA-256
+	ES384   = "ES384"     // ECDSA using P-384 and SHA-384
+	ES512   = "ES512"     // ECDSA using P-521 and SHA-512
+	PS256   = "PS256"     // RSASSA-PSS using SHA256 and MGF1-SHA256
+	PS384   = "PS384"     // RSASSA-PSS using SHA384 and MGF1-SHA384
+	PS512   = "PS512"     // RSASSA-PSS using SHA512 and MGF1-SHA512
+	EdDSA   = "EdDSA"     // Ed25519 using SHA-512
+	MLDSA44 = "ML-DSA-44" // ML-DSA-44 (FIPS 204, RFC 9964)
+	MLDSA65 = "ML-DSA-65" // ML-DSA-65 (FIPS 204, RFC 9964)
+	MLDSA87 = "ML-DSA-87" // ML-DSA-87 (FIPS 204, RFC 9964)
 )
 
 var allAlgs = []jose.SignatureAlgorithm{

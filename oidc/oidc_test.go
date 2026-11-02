@@ -104,6 +104,24 @@ func TestAccessTokenVerification(t *testing.T) {
 			assertNil,
 		},
 		{
+			"MLDSA44Unsupported",
+			newToken(MLDSA44, "xxx"),
+			googleAccessToken,
+			assertMsg(`oidc: unsupported signing algorithm "ML-DSA-44"`),
+		},
+		{
+			"MLDSA65Unsupported",
+			newToken(MLDSA65, "xxx"),
+			googleAccessToken,
+			assertMsg(`oidc: unsupported signing algorithm "ML-DSA-65"`),
+		},
+		{
+			"MLDSA87Unsupported",
+			newToken(MLDSA87, "xxx"),
+			googleAccessToken,
+			assertMsg(`oidc: unsupported signing algorithm "ML-DSA-87"`),
+		},
+		{
 			"badSignAlgo",
 			newToken("none", "xxx"),
 			googleAccessToken,
