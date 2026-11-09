@@ -210,8 +210,6 @@ func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 			// Sync keys and finish inflight when that's done.
 			keys, err := r.updateKeys()
 
-			r.inflight.done(keys, err)
-
 			// Lock to update the keys and indicate that there is no longer an
 			// inflight request.
 			r.mu.Lock()
@@ -221,7 +219,8 @@ func (r *RemoteKeySet) keysFromRemote(ctx context.Context) ([]jose.JSONWebKey, e
 				r.cachedKeys = keys
 			}
 
-			// Free inflight so a different request can run.
+			// Publish the result with the cache update before allowing another fetch.
+			r.inflight.done(keys, err)
 			r.inflight = nil
 		}()
 	}
