@@ -333,7 +333,7 @@ func (v *IDTokenVerifier) verifyJWT(ctx context.Context, rawIDToken string) ([]b
 		ctx = context.WithValue(ctx, parsedJWTKey, jws)
 		payload, err = v.keySet.VerifySignature(ctx, rawIDToken)
 		if err != nil {
-			return nil, jose.Signature{}, fmt.Errorf("failed to verify signature: %v", err)
+			return nil, jose.Signature{}, fmt.Errorf("failed to verify signature: %w", err)
 		}
 	}
 	return payload, sig, nil
