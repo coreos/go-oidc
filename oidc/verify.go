@@ -310,7 +310,7 @@ func (v *IDTokenVerifier) verifyJWT(ctx context.Context, rawIDToken string) ([]b
 
 	// Parse and verify the signature first. This at least forces the user to have
 	// a valid, signed ID token before we do any other processing.
-	jws, err := jose.ParseSigned(rawIDToken, supportedSigAlgs)
+	jws, err := jose.ParseSignedCompact(rawIDToken, supportedSigAlgs)
 	if err != nil {
 		return nil, jose.Signature{}, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
