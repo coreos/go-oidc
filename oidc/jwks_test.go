@@ -147,7 +147,7 @@ func TestKeyVerifyContextCanceled(t *testing.T) {
 	payload := []byte("a secret")
 
 	good := newECDSAKey(t)
-	jws, err := jose.ParseSigned(good.sign(t, payload), allAlgs)
+	jws, err := jose.ParseSignedCompact(good.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,11 +182,11 @@ func testKeyVerify(t *testing.T, good, bad *signingKey, verification ...*signing
 
 	payload := []byte("a secret")
 
-	jws, err := jose.ParseSigned(good.sign(t, payload), allAlgs)
+	jws, err := jose.ParseSignedCompact(good.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	badJWS, err := jose.ParseSigned(bad.sign(t, payload), allAlgs)
+	badJWS, err := jose.ParseSignedCompact(bad.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,11 +230,11 @@ func TestRotation(t *testing.T) {
 	key2.keyID = "key2"
 
 	payload := []byte("a secret")
-	jws1, err := jose.ParseSigned(key1.sign(t, payload), allAlgs)
+	jws1, err := jose.ParseSignedCompact(key1.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jws2, err := jose.ParseSigned(key2.sign(t, payload), allAlgs)
+	jws2, err := jose.ParseSignedCompact(key2.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestUpdateKeysSendsCacheControlNoCache(t *testing.T) {
 	rks := newRemoteKeySet(ctx, s.URL)
 
 	payload := []byte("a secret")
-	jws, err := jose.ParseSigned(key.sign(t, payload), allAlgs)
+	jws, err := jose.ParseSignedCompact(key.sign(t, payload), allAlgs)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -27,7 +27,7 @@ type StaticKeySet struct {
 func (s *StaticKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
 	// Algorithms are already checked by Verifier, so this parse method accepts
 	// any algorithm.
-	jws, err := jose.ParseSigned(jwt, allAlgs)
+	jws, err := jose.ParseSignedCompact(jwt, allAlgs)
 	if err != nil {
 		return nil, fmt.Errorf("parsing jwt: %v", err)
 	}
@@ -144,7 +144,7 @@ func (r *RemoteKeySet) VerifySignature(ctx context.Context, jwt string) ([]byte,
 		// Practically, this codepath isn't called in normal use of this package, but
 		// if it is, the algorithms have already been checked.
 		var err error
-		jws, err = jose.ParseSigned(jwt, allAlgs)
+		jws, err = jose.ParseSignedCompact(jwt, allAlgs)
 		if err != nil {
 			return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 		}
